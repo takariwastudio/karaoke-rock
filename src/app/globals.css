@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-bebas: 'Bebas Neue', Impact, sans-serif;
+  --font-inter: 'Inter', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-inter);
+  background: #0f0f0f;
+  color: #F0EDE8;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #E63946; border-radius: 2px; }
+
+*:focus-visible { outline: 2px solid #E63946; outline-offset: 2px; }
+
+input, textarea, select, button { font-family: var(--font-inter); }
+
+@layer components {
+  .card   { @apply bg-r-surf border border-r-border rounded-xl p-4; }
+  .card2  { @apply bg-r-surf2 border border-r-border rounded-xl p-4; }
+  .input  { @apply w-full bg-r-bg border border-r-border rounded-lg px-3 py-2.5 text-r-text text-sm placeholder-r-muted focus:border-r-red focus:outline-none transition-colors; }
+  .label  { @apply block text-[11px] font-semibold uppercase tracking-widest text-r-muted mb-1.5; }
+  .btn-primary   { @apply w-full bg-r-red hover:bg-r-red-d text-white font-display text-xl tracking-widest py-3 rounded-xl transition-colors cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed; }
+  .btn-ghost     { @apply bg-r-surf2 hover:bg-r-border text-r-text text-sm font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer border border-r-border; }
+  .btn-danger    { @apply bg-transparent text-r-muted hover:text-r-red text-sm px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-r-border hover:border-r-red/40; }
+  .section-title { @apply text-[11px] font-semibold uppercase tracking-[0.15em] text-r-muted mb-3; }
+  .badge-waiting { @apply inline-flex items-center text-[11px] px-2 py-0.5 rounded font-medium bg-r-amber/15 text-r-amber border border-r-amber/20; }
+  .badge-singing { @apply inline-flex items-center text-[11px] px-2 py-0.5 rounded font-medium bg-r-red/20 text-r-red border border-r-red/30; }
+  .badge-done    { @apply inline-flex items-center text-[11px] px-2 py-0.5 rounded font-medium bg-r-green/10 text-r-green border border-r-green/20; }
+  .badge-noshow  { @apply inline-flex items-center text-[11px] px-2 py-0.5 rounded font-medium bg-r-muted/10 text-r-muted border border-r-muted/20; }
+}

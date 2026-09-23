@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node ./node_modules/typescript/bin/tsc --noEmit -p .)",
+      "Bash(rm src/lib/store.ts src/lib/songs.ts)",
+      "Bash(npm install *)",
+      "Bash(xargs grep -l \"setAll\")",
+      "Bash(npx next *)"
+    ]
+  }
+}
