@@ -155,7 +155,7 @@ export default function StagePage() {
   const origin =
     typeof window !== "undefined"
       ? window.location.origin
-      : "http://localhost:3000";
+      : "https://karaokerock.com.ve";
 
   return (
     <div
