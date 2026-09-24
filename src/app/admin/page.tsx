@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Mic,
   SkipForward,
@@ -137,6 +137,9 @@ export default function AdminPage() {
     type: "ok" | "err";
   } | null>(null);
 
+  // Evita que load() resetee el input de fecha en cada acción del DJ
+  const dateInitialized = useRef(false);
+
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -166,18 +169,24 @@ export default function AdminPage() {
     ]);
     if (evRes.event) {
       setEvent(evRes.event);
-      if (evRes.event.starts_at) {
-        const d = new Date(evRes.event.starts_at);
-        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-          .toISOString()
-          .slice(0, 16);
-        setEventDateTime(local);
+      // Solo inicializar el input la primera vez — no resetear en cada acción del DJ
+      if (!dateInitialized.current) {
+        dateInitialized.current = true;
+        if (evRes.event.starts_at) {
+          const d = new Date(evRes.event.starts_at);
+          const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+            .toISOString()
+            .slice(0, 16);
+          setEventDateTime(local);
+        } else {
+          setEventDateTime("");
+        }
       }
     }
     if (qRes.data) setQueue(qRes.data);
     if (rRes.data) setRatings(rRes.data);
     if (uRes.data) setUsers(uRes.data);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (authed) load();
@@ -206,7 +215,7 @@ export default function AdminPage() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [authed, event, load]);
+  }, [authed, event, load, supabase]);
 
   const djAction = async (action: string, extra?: object) => {
     const res = await fetch("/api/admin", {
@@ -272,6 +281,11 @@ export default function AdminPage() {
     });
     if (res.ok) {
       setEvent((ev) => (ev ? { ...ev, starts_at } : ev));
+      // Al quitar el countdown, resetear también el ref para que la próxima carga lo inicialice bien
+      if (clear) {
+        dateInitialized.current = false;
+        setEventDateTime("");
+      }
       showToast(clear ? "Countdown eliminado" : "Fecha del evento guardada ✓");
     } else {
       showToast("Error al guardar la fecha", "err");
@@ -437,10 +451,9 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* DJ Controls — dos columnas en desktop */}
+      {/* DJ Controls */}
       <div className="px-8 py-5 border-b border-r-border bg-r-surf/30">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Cantante actual */}
           <div className="card relative overflow-hidden">
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-r-red to-r-amber" />
             <div className="flex items-start justify-between gap-4">
@@ -521,7 +534,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Cola próximos */}
           <div className="card">
             <p className="section-title">
               Próximos en la lista ({waiting.length})
@@ -584,7 +596,6 @@ export default function AdminPage() {
         {/* Dashboard */}
         {tab === "dashboard" && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Columna principal */}
             <div className="xl:col-span-2 space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
@@ -730,7 +741,6 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Columna derecha: Top cantantes */}
             <div>
               <div className="card">
                 <div className="flex items-center gap-2 mb-4">
@@ -858,7 +868,6 @@ export default function AdminPage() {
         {/* Config */}
         {tab === "config" && event && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Cooldown */}
             <div className="card">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Settings size={15} className="text-r-red" /> Cooldown entre
@@ -918,7 +927,6 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Fecha del evento */}
             <div className="card flex flex-col">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Calendar size={15} className="text-r-amber" /> Próximo evento
