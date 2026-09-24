@@ -72,10 +72,15 @@ function CountdownView({
       </div>
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center gap-6">
         <div>
-          <h1 className="font-display text-4xl tracking-[4px]">
-            KARAOKE <span className="text-r-red">ROCK</span>
-          </h1>
-          <p className="text-r-muted text-sm mt-1">Maracay</p>
+          <Image
+            src="/HOR_B.webp"
+            alt="Karaoke Rock"
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="h-12 w-auto mx-auto"
+            priority
+          />
         </div>
         <p className="text-r-muted text-sm">
           Hola, <span className="text-r-text font-medium">{userName}</span>. El
