@@ -69,6 +69,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Canción ya pedida hoy
+  const { data: songExists } = await db
+    .from("song_queue")
+    .select("id")
+    .eq("event_id", event.id)
+    .ilike("song_name", song_name.trim())
+    .ilike("artist", artist.trim())
+    .not("status", "eq", "removed")
+    .limit(1)
+    .single();
+
+  if (songExists) {
+    return NextResponse.json(
+      {
+        error: "song_taken",
+        message:
+          "Esa canción ya fue pedida hoy. ¡Elige otra! Así no te molestas que alguien que cante feo, ya la tenga pedida.",
+      },
+      { status: 409 },
+    );
+  }
+
   const { data: song, error } = await db
     .from("song_queue")
     .insert({

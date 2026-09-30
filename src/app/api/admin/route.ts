@@ -8,8 +8,17 @@ function auth(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!auth(req))
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const { action, event_id, user_id, song_id, cooldown_minutes, starts_at } =
-    await req.json();
+  const {
+    action,
+    event_id,
+    user_id,
+    song_id,
+    cooldown_minutes,
+    starts_at,
+    bcv_rate,
+    ticket_price_bs,
+    ticket_price_usdt,
+  } = await req.json();
   const db = createServiceClient();
 
   switch (action) {
@@ -108,6 +117,33 @@ export async function POST(req: NextRequest) {
       const { error } = await db
         .from("events")
         .update({ cooldown_minutes: Number(cooldown_minutes) })
+        .eq("id", event_id);
+      if (error)
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+    case "set_bcv_rate": {
+      const { error } = await db
+        .from("events")
+        .update({ bcv_rate })
+        .eq("id", event_id);
+      if (error)
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+    case "set_ticket_price_bs": {
+      const { error } = await db
+        .from("events")
+        .update({ ticket_price_bs })
+        .eq("id", event_id);
+      if (error)
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+    case "set_ticket_price_usdt": {
+      const { error } = await db
+        .from("events")
+        .update({ ticket_price_usdt })
         .eq("id", event_id);
       if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });

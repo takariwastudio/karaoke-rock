@@ -13,6 +13,9 @@ export interface Event {
   is_active: boolean;
   cooldown_minutes: number;
   starts_at: string | null;
+  ticket_price_bs: number | null;
+  ticket_price_usdt: number;
+  bcv_rate: number;
   created_at: string;
 }
 

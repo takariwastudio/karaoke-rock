@@ -11,14 +11,18 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.43.4",
     "clsx": "^2.1.1",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.400.0",
     "next": "14.2.5",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "resend": "^6.31.0"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10",

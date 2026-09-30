@@ -7,7 +7,6 @@ import {
   Play,
   Users,
   Music,
-  Star,
   Ban,
   BarChart2,
   Settings,
@@ -21,6 +20,7 @@ import {
   Calendar,
   Copy,
   ExternalLink,
+  Ticket,
 } from "lucide-react";
 import clsx from "clsx";
 import Image from "next/image";
@@ -128,16 +128,28 @@ export default function AdminPage() {
   const [queue, setQueue] = useState<SongQueue[]>([]);
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
-  const [tab, setTab] = useState<"dashboard" | "usuarios" | "config">(
-    "dashboard",
-  );
+  const [tab, setTab] = useState<
+    "dashboard" | "usuarios" | "entradas" | "config"
+  >("dashboard");
   const [eventDateTime, setEventDateTime] = useState("");
   const [toast, setToast] = useState<{
     msg: string;
     type: "ok" | "err";
   } | null>(null);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [ticketTab, setTicketTab] = useState<
+    "pending" | "approved" | "used" | "rejected"
+  >("pending");
+  const [bcvLoading, setBcvLoading] = useState(false);
+  const [rejectModal, setRejectModal] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [bsPrice, setBsPrice] = useState("");
+  const [usdtPrice, setUsdtPrice] = useState("5");
+  const priceInitialized = useRef(false);
 
-  // Evita que load() resetee el input de fecha en cada acción del DJ
   const dateInitialized = useRef(false);
 
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
@@ -169,7 +181,11 @@ export default function AdminPage() {
     ]);
     if (evRes.event) {
       setEvent(evRes.event);
-      // Solo inicializar el input la primera vez — no resetear en cada acción del DJ
+      if (!priceInitialized.current) {
+        priceInitialized.current = true;
+        setBsPrice(evRes.event.ticket_price_bs?.toString() || "");
+        setUsdtPrice(evRes.event.ticket_price_usdt?.toString() || "5");
+      }
       if (!dateInitialized.current) {
         dateInitialized.current = true;
         if (evRes.event.starts_at) {
@@ -188,9 +204,21 @@ export default function AdminPage() {
     if (uRes.data) setUsers(uRes.data);
   }, [supabase]);
 
+  const loadTickets = useCallback(async () => {
+    if (!event) return;
+    const res = await fetch(`/api/tickets?event_id=${event.id}`, {
+      headers: { "x-admin-password": pw },
+    });
+    const data = await res.json();
+    if (data.tickets) setTickets(data.tickets);
+  }, [event, pw]);
+
   useEffect(() => {
     if (authed) load();
   }, [authed, load]);
+  useEffect(() => {
+    if (authed && event) loadTickets();
+  }, [authed, event, loadTickets]);
 
   useEffect(() => {
     if (!authed || !event) return;
@@ -211,11 +239,16 @@ export default function AdminPage() {
         { event: "*", schema: "public", table: "profiles" },
         load,
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tickets" },
+        loadTickets,
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [authed, event, load, supabase]);
+  }, [authed, event, load, loadTickets, supabase]);
 
   const djAction = async (action: string, extra?: object) => {
     const res = await fetch("/api/admin", {
@@ -225,7 +258,7 @@ export default function AdminPage() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      console.error("[djAction] falló:", action, res.status, err);
+      console.error("[djAction]", action, res.status, err);
       if (res.status === 401)
         showToast("Password incorrecto o sesión expirada.", "err");
       return;
@@ -235,7 +268,7 @@ export default function AdminPage() {
 
   const saveCooldown = async (minutes: number) => {
     if (!event?.id) {
-      showToast("Evento no cargado. Recarga la página.", "err");
+      showToast("Evento no cargado.", "err");
       return;
     }
     const res = await fetch("/api/admin", {
@@ -256,7 +289,6 @@ export default function AdminPage() {
         `Error ${res.status}: ${data?.error ?? "Revisa la consola"}`,
         "err",
       );
-      console.error("[saveCooldown]", res.status, data);
     }
   };
 
@@ -281,7 +313,6 @@ export default function AdminPage() {
     });
     if (res.ok) {
       setEvent((ev) => (ev ? { ...ev, starts_at } : ev));
-      // Al quitar el countdown, resetear también el ref para que la próxima carga lo inicialice bien
       if (clear) {
         dateInitialized.current = false;
         setEventDateTime("");
@@ -289,6 +320,79 @@ export default function AdminPage() {
       showToast(clear ? "Countdown eliminado" : "Fecha del evento guardada ✓");
     } else {
       showToast("Error al guardar la fecha", "err");
+    }
+  };
+
+  const fetchBcv = async () => {
+    setBcvLoading(true);
+    const res = await fetch("/api/bcv");
+    const data = await res.json();
+    setBcvLoading(false);
+
+    if (!data.rate) {
+      showToast("No se pudo obtener la tasa del BCV", "err");
+      return;
+    }
+
+    const rate = data.rate;
+    const usdtPrice = event?.ticket_price_usdt ?? 5;
+    const bsPrice = Math.round(rate * usdtPrice);
+
+    await Promise.all([
+      fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": pw },
+        body: JSON.stringify({
+          action: "set_bcv_rate",
+          event_id: event?.id,
+          bcv_rate: rate,
+        }),
+      }),
+      fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": pw },
+        body: JSON.stringify({
+          action: "set_ticket_price_bs",
+          event_id: event?.id,
+          ticket_price_bs: bsPrice,
+        }),
+      }),
+    ]);
+
+    setBsPrice(bsPrice.toString());
+    setEvent((ev) =>
+      ev ? { ...ev, bcv_rate: rate, ticket_price_bs: bsPrice } : ev,
+    );
+    showToast(
+      `Tasa BCV: ${rate} Bs/USD · Entrada: ${bsPrice.toLocaleString("es-VE")} Bs ✓`,
+    );
+  };
+
+  const approveTicket = async (ticket_id: string) => {
+    const res = await fetch("/api/tickets/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify({ ticket_id }),
+    });
+    if (res.ok) {
+      showToast("Entrada aprobada — email enviado ✓");
+      loadTickets();
+    } else showToast("Error al aprobar", "err");
+  };
+
+  const rejectTicket = async (ticket_id: string, reason: string) => {
+    const res = await fetch("/api/tickets/reject", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify({ ticket_id, reason }),
+    });
+    if (res.ok) {
+      showToast("Entrada rechazada");
+      setRejectModal(null);
+      setRejectReason("");
+      loadTickets();
+    } else {
+      showToast("Error al rechazar", "err");
     }
   };
 
@@ -355,6 +459,7 @@ export default function AdminPage() {
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: BarChart2 },
     { id: "usuarios", label: "Usuarios", icon: Users },
+    { id: "entradas", label: "Entradas", icon: Ticket },
     { id: "config", label: "Config", icon: Settings },
   ] as const;
 
@@ -392,7 +497,8 @@ export default function AdminPage() {
         const links = [
           { label: "Home", path: "/home" },
           { label: "Stage", path: "/stage" },
-          { label: "Admin", path: "/admin" },
+          { label: "Entradas", path: "/tickets" },
+          { label: "Scanner", path: "/scanner" },
         ];
         return (
           <div className="px-8 py-2 bg-r-bg border-b border-r-border flex items-center gap-3 flex-wrap">
@@ -408,7 +514,7 @@ export default function AdminPage() {
                 >
                   <span className="text-xs text-r-muted">{label}</span>
                   <span className="text-[11px] text-r-border mx-1">·</span>
-                  <span className="text-[11px] text-r-muted font-mono truncate max-w-[160px]">
+                  <span className="text-[11px] text-r-muted font-mono truncate max-w-[140px]">
                     {url}
                   </span>
                   <button
@@ -575,7 +681,7 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <nav className="px-8 py-3 flex gap-2 border-b border-r-border">
+      <nav className="px-8 py-3 flex gap-2 border-b border-r-border flex-wrap">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -588,12 +694,18 @@ export default function AdminPage() {
             )}
           >
             <Icon size={12} /> {label}
+            {id === "entradas" &&
+              tickets.filter((t) => t.status === "pending").length > 0 && (
+                <span className="ml-1 bg-r-red text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                  {tickets.filter((t) => t.status === "pending").length}
+                </span>
+              )}
           </button>
         ))}
       </nav>
 
       <main className="flex-1 overflow-y-auto p-8">
-        {/* Dashboard */}
+        {/* ── DASHBOARD ─────────────────────────────── */}
         {tab === "dashboard" && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 space-y-4">
@@ -609,7 +721,7 @@ export default function AdminPage() {
                     label: "Pedidas",
                     value: queue.length,
                     color: "text-r-red",
-                    icon: Music,
+                    icon: Mic,
                   },
                   {
                     label: "Cantaron",
@@ -678,7 +790,7 @@ export default function AdminPage() {
                     <div>
                       <p className="font-semibold">{topUser.prof.name}</p>
                       <p className="text-sm text-r-muted">
-                        {topUser.count} canción(es) pedida(s)
+                        {topUser.count} canción(es)
                       </p>
                     </div>
                   </div>
@@ -797,7 +909,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Usuarios */}
+        {/* ── USUARIOS ──────────────────────────────── */}
         {tab === "usuarios" && (
           <div className="space-y-2">
             <p className="section-title">{users.length} usuarios registrados</p>
@@ -865,9 +977,176 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Config */}
+        {/* ── ENTRADAS ──────────────────────────────── */}
+        {tab === "entradas" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(["pending", "approved", "used", "rejected"] as const).map(
+                (s) => {
+                  const count = tickets.filter((t) => t.status === s).length;
+                  const labels = {
+                    pending: "Pendientes",
+                    approved: "Aprobadas",
+                    used: "Usadas",
+                    rejected: "Rechazadas",
+                  };
+                  const colors = {
+                    pending: "text-r-amber",
+                    approved: "text-r-green",
+                    used: "text-r-muted",
+                    rejected: "text-r-red",
+                  };
+                  return (
+                    <div
+                      key={s}
+                      onClick={() => setTicketTab(s)}
+                      className="card2 flex flex-col gap-1 cursor-pointer hover:border-r-red/30 transition-colors"
+                    >
+                      <span className="text-[10px] uppercase tracking-widest text-r-muted font-semibold">
+                        {labels[s]}
+                      </span>
+                      <p
+                        className={clsx(
+                          "font-display text-4xl leading-none",
+                          colors[s],
+                        )}
+                      >
+                        {count}
+                      </p>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+
+            <div className="flex gap-2 flex-wrap items-center">
+              {(["pending", "approved", "used", "rejected"] as const).map(
+                (s) => (
+                  <button
+                    key={s}
+                    onClick={() => setTicketTab(s)}
+                    className={clsx(
+                      "text-xs px-3 py-1.5 rounded-lg border transition-colors capitalize",
+                      ticketTab === s
+                        ? "bg-r-red/15 border-r-red/30 text-r-red"
+                        : "border-r-border text-r-muted hover:text-r-text",
+                    )}
+                  >
+                    {s === "pending"
+                      ? "Pendientes"
+                      : s === "approved"
+                        ? "Aprobadas"
+                        : s === "used"
+                          ? "Usadas"
+                          : "Rechazadas"}
+                  </button>
+                ),
+              )}
+              <button
+                onClick={loadTickets}
+                className="ml-auto text-r-muted hover:text-r-text p-1.5"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {tickets.filter((t) => t.status === ticketTab).length === 0 && (
+                <p className="text-r-muted text-sm text-center py-8">
+                  Sin entradas en este estado
+                </p>
+              )}
+              {tickets
+                .filter((t) => t.status === ticketTab)
+                .map((t) => (
+                  <div key={t.id} className="card flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold">{t.name}</p>
+                        <span className="text-[10px] text-r-muted">
+                          {t.cedula}
+                        </span>
+                      </div>
+                      <p className="text-xs text-r-muted mt-0.5">
+                        {t.email} · {t.phone}
+                      </p>
+                      <div className="flex gap-3 mt-1 text-xs text-r-muted flex-wrap">
+                        <span className="capitalize">
+                          {t.payment_method.replace("_", " ")}
+                        </span>
+                        <span>
+                          {t.payment_amount} {t.payment_currency}
+                        </span>
+                        <span>
+                          Ref:{" "}
+                          <span className="font-mono text-r-text">
+                            {t.payment_ref}
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-r-muted mt-1">
+                        {new Date(t.created_at).toLocaleString("es-VE", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      {t.status === "used" && t.validated_at && (
+                        <p className="text-[10px] text-r-green mt-0.5">
+                          ✓ Validada a las{" "}
+                          {new Date(t.validated_at).toLocaleTimeString(
+                            "es-VE",
+                            { hour: "2-digit", minute: "2-digit" },
+                          )}
+                        </p>
+                      )}
+                      {t.status === "rejected" && t.rejection_reason && (
+                        <p className="text-[10px] text-r-red mt-0.5">
+                          ✗ {t.rejection_reason}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      {t.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => approveTicket(t.id)}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-r-green/15 border border-r-green/30 text-r-green hover:bg-r-green/25 transition-colors"
+                          >
+                            Aprobar
+                          </button>
+                          <button
+                            onClick={() =>
+                              setRejectModal({ id: t.id, name: t.name })
+                            }
+                            className="text-xs px-3 py-1.5 rounded-lg border border-r-border text-r-muted hover:text-r-red hover:border-r-red/30 transition-colors"
+                          >
+                            Rechazar
+                          </button>
+                        </>
+                      )}
+                      {(t.status === "approved" || t.status === "used") && (
+                        <a
+                          href={`/entry/${t.token}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-3 py-1.5 rounded-lg border border-r-border text-r-muted hover:text-r-text transition-colors text-center"
+                        >
+                          Ver QR
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── CONFIG ────────────────────────────────── */}
         {tab === "config" && event && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Cooldown */}
             <div className="card">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Settings size={15} className="text-r-red" /> Cooldown entre
@@ -927,6 +1206,7 @@ export default function AdminPage() {
               </button>
             </div>
 
+            {/* Próximo evento */}
             <div className="card flex flex-col">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Calendar size={15} className="text-r-amber" /> Próximo evento
@@ -935,7 +1215,6 @@ export default function AdminPage() {
                 Activa un countdown en el home hasta que llegue la hora. Quítalo
                 si el evento empieza de sorpresa o para pruebas.
               </p>
-
               {event.starts_at && (
                 <div className="mb-4 bg-r-amber/10 border border-r-amber/20 rounded-lg px-3 py-2.5">
                   <p className="text-xs text-r-muted">Countdown activo para</p>
@@ -953,7 +1232,6 @@ export default function AdminPage() {
                   </p>
                 </div>
               )}
-
               <div className="flex-1">
                 <label className="label">Fecha y hora de inicio</label>
                 <input
@@ -963,7 +1241,6 @@ export default function AdminPage() {
                   onChange={(e) => setEventDateTime(e.target.value)}
                 />
               </div>
-
               <div className="flex gap-2 mt-5">
                 <button
                   className="btn-ghost flex-1"
@@ -982,9 +1259,146 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
+
+            {/* Precio de entradas */}
+            <div className="card lg:col-span-2">
+              <h3 className="font-semibold mb-1 flex items-center gap-2">
+                <Ticket size={15} className="text-r-purple" /> Precio de
+                entradas
+              </h3>
+              <p className="text-xs text-r-muted mb-5">
+                Configura los precios antes de abrir la venta
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Precio en Bolívares</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input flex-1"
+                      placeholder="Ej: 36500"
+                      value={bsPrice}
+                      onChange={(e) => setBsPrice(e.target.value)}
+                    />
+                    <button
+                      onClick={fetchBcv}
+                      disabled={bcvLoading}
+                      className="btn-ghost text-xs shrink-0 px-3"
+                    >
+                      {bcvLoading ? "..." : "📡 BCV"}
+                    </button>
+                  </div>
+                  {event.bcv_rate > 0 && (
+                    <p className="text-xs text-r-muted mt-1.5">
+                      Tasa BCV:{" "}
+                      <span className="text-r-text">{event.bcv_rate}</span>{" "}
+                      Bs/USD · {usdtPrice} USDT ≈{" "}
+                      <span className="text-r-amber">
+                        {(
+                          parseFloat(usdtPrice) * event.bcv_rate
+                        ).toLocaleString("es-VE")}{" "}
+                        Bs
+                      </span>
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">
+                    Precio en USDT (incluye 🍺 2 cervezas)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    value={usdtPrice}
+                    onChange={(e) => setUsdtPrice(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <button
+                className="btn-ghost mt-5 w-full"
+                onClick={async () => {
+                  await Promise.all([
+                    fetch("/api/admin", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "x-admin-password": pw,
+                      },
+                      body: JSON.stringify({
+                        action: "set_ticket_price_bs",
+                        event_id: event.id,
+                        ticket_price_bs: parseFloat(bsPrice),
+                      }),
+                    }),
+                    fetch("/api/admin", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "x-admin-password": pw,
+                      },
+                      body: JSON.stringify({
+                        action: "set_ticket_price_usdt",
+                        event_id: event.id,
+                        ticket_price_usdt: parseFloat(usdtPrice),
+                      }),
+                    }),
+                  ]);
+                  showToast("Precios guardados ✓");
+                }}
+              >
+                Guardar precios
+              </button>
+            </div>
           </div>
         )}
       </main>
+
+      {/* Reject modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6">
+          <div className="card w-full max-w-sm space-y-4">
+            <h3 className="font-semibold">
+              Rechazar entrada de {rejectModal.name}
+            </h3>
+            <div>
+              <label className="label">Motivo (opcional)</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Pago no verificado"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" &&
+                  rejectTicket(rejectModal.id, rejectReason)
+                }
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => rejectTicket(rejectModal.id, rejectReason)}
+                className="flex-1 text-sm bg-r-red/15 border border-r-red/30 text-r-red px-4 py-2 rounded-lg hover:bg-r-red/25 transition-colors"
+              >
+                Confirmar rechazo
+              </button>
+              <button
+                onClick={() => {
+                  setRejectModal(null);
+                  setRejectReason("");
+                }}
+                className="flex-1 btn-ghost text-sm"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
