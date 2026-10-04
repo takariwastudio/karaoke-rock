@@ -148,9 +148,10 @@ export default function AdminPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [bsPrice, setBsPrice] = useState("");
   const [usdtPrice, setUsdtPrice] = useState("5");
-  const priceInitialized = useRef(false);
+  const [closing, setClosing] = useState(false);
 
   const dateInitialized = useRef(false);
+  const priceInitialized = useRef(false);
 
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
     setToast({ msg, type });
@@ -199,7 +200,8 @@ export default function AdminPage() {
         }
       }
     }
-    if (qRes.data) setQueue(qRes.data);
+    if (qRes.data)
+      setQueue(qRes.data.filter((q) => q.event_id === evRes.event?.id));
     if (rRes.data) setRatings(rRes.data);
     if (uRes.data) setUsers(uRes.data);
   }, [supabase]);
@@ -328,16 +330,13 @@ export default function AdminPage() {
     const res = await fetch("/api/bcv");
     const data = await res.json();
     setBcvLoading(false);
-
     if (!data.rate) {
       showToast("No se pudo obtener la tasa del BCV", "err");
       return;
     }
-
     const rate = data.rate;
-    const usdtPrice = event?.ticket_price_usdt ?? 5;
-    const bsPrice = Math.round(rate * usdtPrice);
-
+    const usdtVal = event?.ticket_price_usdt ?? 5;
+    const bsVal = Math.round(rate * usdtVal);
     await Promise.all([
       fetch("/api/admin", {
         method: "POST",
@@ -354,17 +353,16 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "set_ticket_price_bs",
           event_id: event?.id,
-          ticket_price_bs: bsPrice,
+          ticket_price_bs: bsVal,
         }),
       }),
     ]);
-
-    setBsPrice(bsPrice.toString());
+    setBsPrice(bsVal.toString());
     setEvent((ev) =>
-      ev ? { ...ev, bcv_rate: rate, ticket_price_bs: bsPrice } : ev,
+      ev ? { ...ev, bcv_rate: rate, ticket_price_bs: bsVal } : ev,
     );
     showToast(
-      `Tasa BCV: ${rate} Bs/USD · Entrada: ${bsPrice.toLocaleString("es-VE")} Bs ✓`,
+      `Tasa BCV: ${rate} Bs/USD · Entrada: ${bsVal.toLocaleString("es-VE")} Bs ✓`,
     );
   };
 
@@ -391,8 +389,32 @@ export default function AdminPage() {
       setRejectModal(null);
       setRejectReason("");
       loadTickets();
+    } else showToast("Error al rechazar", "err");
+  };
+
+  const closeNight = async () => {
+    if (!event?.id) return;
+    if (
+      !confirm(
+        "¿Cerrar la noche actual? Esto guardará al ganador y creará un nuevo evento en blanco.",
+      )
+    )
+      return;
+    setClosing(true);
+    const res = await fetch("/api/admin/close-night", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify({ event_id: event.id }),
+    });
+    const data = await res.json();
+    setClosing(false);
+    if (res.ok) {
+      showToast("¡Noche cerrada! Nuevo evento creado ✓");
+      dateInitialized.current = false;
+      priceInitialized.current = false;
+      await load();
     } else {
-      showToast("Error al rechazar", "err");
+      showToast(`Error: ${data.error}`, "err");
     }
   };
 
@@ -705,7 +727,7 @@ export default function AdminPage() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-8">
-        {/* ── DASHBOARD ─────────────────────────────── */}
+        {/* DASHBOARD */}
         {tab === "dashboard" && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 space-y-4">
@@ -721,7 +743,7 @@ export default function AdminPage() {
                     label: "Pedidas",
                     value: queue.length,
                     color: "text-r-red",
-                    icon: Mic,
+                    icon: Music,
                   },
                   {
                     label: "Cantaron",
@@ -857,7 +879,9 @@ export default function AdminPage() {
               <div className="card">
                 <div className="flex items-center gap-2 mb-4">
                   <Trophy size={14} className="text-r-amber" />
-                  <span className="section-title mb-0">Top cantantes</span>
+                  <span className="section-title mb-0">
+                    Top cantantes esta noche
+                  </span>
                 </div>
                 {topRated.length === 0 ? (
                   <p className="text-r-muted text-sm">Nadie calificado aún</p>
@@ -909,7 +933,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── USUARIOS ──────────────────────────────── */}
+        {/* USUARIOS */}
         {tab === "usuarios" && (
           <div className="space-y-2">
             <p className="section-title">{users.length} usuarios registrados</p>
@@ -977,7 +1001,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── ENTRADAS ──────────────────────────────── */}
+        {/* ENTRADAS */}
         {tab === "entradas" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1018,7 +1042,6 @@ export default function AdminPage() {
                 },
               )}
             </div>
-
             <div className="flex gap-2 flex-wrap items-center">
               {(["pending", "approved", "used", "rejected"] as const).map(
                 (s) => (
@@ -1026,7 +1049,7 @@ export default function AdminPage() {
                     key={s}
                     onClick={() => setTicketTab(s)}
                     className={clsx(
-                      "text-xs px-3 py-1.5 rounded-lg border transition-colors capitalize",
+                      "text-xs px-3 py-1.5 rounded-lg border transition-colors",
                       ticketTab === s
                         ? "bg-r-red/15 border-r-red/30 text-r-red"
                         : "border-r-border text-r-muted hover:text-r-text",
@@ -1049,7 +1072,6 @@ export default function AdminPage() {
                 <RefreshCw size={14} />
               </button>
             </div>
-
             <div className="space-y-2">
               {tickets.filter((t) => t.status === ticketTab).length === 0 && (
                 <p className="text-r-muted text-sm text-center py-8">
@@ -1066,6 +1088,11 @@ export default function AdminPage() {
                         <span className="text-[10px] text-r-muted">
                           {t.cedula}
                         </span>
+                        {(t.quantity || 1) > 1 && (
+                          <span className="text-[10px] text-r-amber border border-r-amber/30 rounded px-1.5 py-0.5">
+                            {t.quantity} personas
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-r-muted mt-0.5">
                         {t.email} · {t.phone}
@@ -1147,10 +1174,9 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── CONFIG ────────────────────────────────── */}
+        {/* CONFIG */}
         {tab === "config" && event && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Cooldown */}
             <div className="card">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Settings size={15} className="text-r-red" /> Cooldown entre
@@ -1210,14 +1236,12 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Próximo evento */}
             <div className="card flex flex-col">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Calendar size={15} className="text-r-amber" /> Próximo evento
               </h3>
               <p className="text-xs text-r-muted mb-6">
-                Activa un countdown en el home hasta que llegue la hora. Quítalo
-                si el evento empieza de sorpresa o para pruebas.
+                Activa un countdown en el home hasta que llegue la hora.
               </p>
               {event.starts_at && (
                 <div className="mb-4 bg-r-amber/10 border border-r-amber/20 rounded-lg px-3 py-2.5">
@@ -1264,7 +1288,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Precio de entradas */}
             <div className="card lg:col-span-2">
               <h3 className="font-semibold mb-1 flex items-center gap-2">
                 <Ticket size={15} className="text-r-purple" /> Precio de
@@ -1273,7 +1296,6 @@ export default function AdminPage() {
               <p className="text-xs text-r-muted mb-5">
                 Configura los precios antes de abrir la venta
               </p>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Precio en Bolívares</label>
@@ -1308,7 +1330,6 @@ export default function AdminPage() {
                     </p>
                   )}
                 </div>
-
                 <div>
                   <label className="label">
                     Precio en USDT (incluye 🍺 2 cervezas)
@@ -1322,7 +1343,6 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
-
               <button
                 className="btn-ghost mt-5 w-full"
                 onClick={async () => {
@@ -1356,6 +1376,39 @@ export default function AdminPage() {
                 }}
               >
                 Guardar precios
+              </button>
+            </div>
+
+            <div className="card lg:col-span-2 border-r-red/20">
+              <h3 className="font-semibold mb-1 flex items-center gap-2">
+                <XCircle size={15} className="text-r-red" /> Cerrar noche
+              </h3>
+              <p className="text-xs text-r-muted mb-4">
+                Guarda al ganador de la noche, cierra el evento actual y crea
+                uno nuevo en blanco. Úsalo al final de cada evento.
+              </p>
+              <div className="bg-r-surf2 rounded-xl p-4 mb-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-r-muted">Evento actual</span>
+                  <span>{event.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-r-muted">Canciones esta noche</span>
+                  <span>
+                    {done.length} cantadas · {waiting.length} en espera
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-r-muted">Votaciones</span>
+                  <span>{ratings.length} votos emitidos</span>
+                </div>
+              </div>
+              <button
+                onClick={closeNight}
+                disabled={closing}
+                className="w-full text-sm text-r-red hover:bg-r-red/10 border border-r-red/30 rounded-xl py-3 transition-colors font-medium disabled:opacity-50"
+              >
+                {closing ? "Cerrando..." : "🌙 Cerrar noche y crear nueva"}
               </button>
             </div>
           </div>

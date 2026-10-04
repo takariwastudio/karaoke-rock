@@ -221,6 +221,26 @@ export default function HomePage() {
     [supabase],
   );
 
+  const reloadEvent = useCallback(async () => {
+    const { data: event } = await supabase
+      .from("events")
+      .select("id, cooldown_minutes, starts_at")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (!event) return;
+    setEventId(event.id);
+    setCooldown(event.cooldown_minutes);
+    setStartsAt(event.starts_at ?? null);
+    setShowCountdown(
+      !!event.starts_at && new Date(event.starts_at).getTime() > Date.now(),
+    );
+    setQueue([]);
+    setRatings([]);
+    await loadData(event.id);
+  }, [supabase, loadData]);
+
   useEffect(() => {
     const init = async () => {
       const {
@@ -231,11 +251,31 @@ export default function HomePage() {
         return;
       }
 
-      const { data: profile } = await supabase
+      let { data: profile } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", authUser.id)
         .single();
+      if (!profile) {
+        await fetch("/api/auth/create-profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: authUser.id,
+            name:
+              authUser.user_metadata?.full_name ||
+              authUser.email?.split("@")[0] ||
+              "Usuario",
+            avatar_url: authUser.user_metadata?.avatar_url || null,
+          }),
+        });
+        const { data: retried } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", authUser.id)
+          .single();
+        profile = retried;
+      }
       if (!profile || profile.is_banned) {
         await supabase.auth.signOut();
         router.replace("/");
@@ -285,7 +325,6 @@ export default function HomePage() {
         { event: "*", schema: "public", table: "ratings" },
         () => loadData(eventId),
       )
-      // ← NUEVO: detecta cuando el admin quita/pone el countdown
       .on(
         "postgres_changes",
         {
@@ -295,17 +334,26 @@ export default function HomePage() {
           filter: `id=eq.${eventId}`,
         },
         (payload: any) => {
+          if (payload.new?.is_active === false) {
+            reloadEvent();
+            return;
+          }
           const sa = payload.new?.starts_at ?? null;
           setStartsAt(sa);
           setShowCountdown(!!sa && new Date(sa).getTime() > Date.now());
           setCooldown(payload.new?.cooldown_minutes ?? 30);
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "events" },
+        () => reloadEvent(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [eventId, loadData, supabase]);
+  }, [eventId, loadData, reloadEvent, supabase]);
 
   if (loading || !user)
     return (
@@ -405,7 +453,7 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1 overflow-y-auto pb-20">
-        {/* ── LISTA ────────────────────────────────── */}
+        {/* ── LISTA ──────────────────────────────── */}
         {tab === "lista" && (
           <div className="p-4 space-y-4">
             <div className="card relative overflow-hidden">
@@ -515,7 +563,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── PEDIR ────────────────────────────────── */}
+        {/* ── PEDIR ──────────────────────────────── */}
         {tab === "pedir" && (
           <PedirTab
             userId={user.id}
@@ -526,7 +574,7 @@ export default function HomePage() {
           />
         )}
 
-        {/* ── CALIFICAR ────────────────────────────── */}
+        {/* ── CALIFICAR ──────────────────────────── */}
         {tab === "calificar" && (
           <div className="p-4 space-y-3">
             <p className="section-title">Califica · máximo 5 recientes</p>
@@ -793,7 +841,6 @@ function PedirTab({
       return;
     }
     setSubmitting(true);
-
     if (isChanging && waitingEntry) {
       const res = await fetch(`/api/songs/${waitingEntry.id}`, {
         method: "PATCH",

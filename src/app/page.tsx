@@ -117,6 +117,34 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    const supabase = createClient();
+    const ch = supabase
+      .channel("login-event")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "events",
+        },
+        (payload: any) => {
+          const sa = payload.new?.starts_at ?? null;
+          if (sa && new Date(sa).getTime() > Date.now()) {
+            setStartsAt(sa);
+            setShowCountdown(true);
+          } else {
+            setStartsAt(null);
+            setShowCountdown(false);
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, []);
+
   const handleGoogle = async () => {
     setLoading(true);
     await supabase.auth.signInWithOAuth({

@@ -44,6 +44,7 @@ export default function TicketsPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     fetch("/api/admin/event")
@@ -58,7 +59,14 @@ export default function TicketsPage() {
       ? `${event?.ticket_price_usdt ?? 5} USDT`
       : event?.ticket_price_bs
         ? `Bs. ${Number(event.ticket_price_bs).toLocaleString("es-VE")}`
-        : "— Bs.";
+        : "- Bs.";
+
+  const totalPrice =
+    method === "binance"
+      ? `${(event?.ticket_price_usdt ?? 5) * quantity} USDT`
+      : event?.ticket_price_bs
+        ? `Bs. ${(Number(event.ticket_price_bs) * quantity).toLocaleString("es-VE")}`
+        : "- Bs.";
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -89,6 +97,7 @@ export default function TicketsPage() {
         ...form,
         payment_method: method,
         event_id: event.id,
+        quantity,
       }),
     });
     const data = await res.json();
@@ -172,10 +181,13 @@ export default function TicketsPage() {
                 )}
               </p>
             )}
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-r-amber font-display text-xl">{price}</span>
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="text-r-amber font-display text-xl">
+                {totalPrice}
+              </span>
               <span className="text-r-muted text-xs">
-                · incluye 🍺 2 cervezas
+                · incluye 🍺{" "}
+                {quantity > 1 ? `2 cervezas por persona` : "2 cervezas"}
               </span>
             </div>
           </div>
@@ -225,6 +237,34 @@ export default function TicketsPage() {
                   )}
                 </div>
               ))}
+              <div>
+                <label className="label">Cantidad de entradas</label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    className="w-10 h-10 rounded-lg border border-r-border text-r-text text-xl hover:bg-r-surf2 transition-colors flex items-center justify-center"
+                  >
+                    −
+                  </button>
+                  <span className="font-display text-3xl text-r-amber w-8 text-center">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                    className="w-10 h-10 rounded-lg border border-r-border text-r-text text-xl hover:bg-r-surf2 transition-colors flex items-center justify-center"
+                  >
+                    +
+                  </button>
+                  <span className="text-r-muted text-sm ml-2">
+                    persona{quantity > 1 ? "s" : ""}
+                  </span>
+                </div>
+                {quantity > 1 && (
+                  <p className="text-xs text-r-muted mt-2">
+                    Un solo QR válido para {quantity} personas que entran juntas
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="card space-y-3">
@@ -265,7 +305,8 @@ export default function TicketsPage() {
               <h3 className="font-semibold">{PAYMENT_INFO[method].label}</h3>
               <p className="text-r-muted text-sm">
                 Realiza el pago de{" "}
-                <span className="text-r-amber font-semibold">{price}</span> a:
+                <span className="text-r-amber font-semibold">{totalPrice}</span>{" "}
+                a:
               </p>
               <div className="bg-r-surf2 rounded-xl p-4 space-y-2.5">
                 {PAYMENT_INFO[method].fields.map(({ label, value }) => (

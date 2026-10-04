@@ -31,6 +31,11 @@ export default function ProfilePage() {
     noshow: 0,
     avgRating: null as number | null,
   });
+  const [winnerToast, setWinnerToast] = useState<{
+    event_date: string;
+    song: string;
+    avg: number;
+  } | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -56,7 +61,6 @@ export default function ProfilePage() {
         router.replace("/");
         return;
       }
-
       setUser(profile);
       setName(profile.name);
 
@@ -69,7 +73,6 @@ export default function ProfilePage() {
         const sang = songs.filter((s) => s.status === "done").length;
         const noshow = songs.filter((s) => s.status === "noshow").length;
         let avgRating = null;
-
         if (songs.length > 0) {
           const { data: ratings } = await supabase
             .from("ratings")
@@ -83,8 +86,28 @@ export default function ProfilePage() {
               ratings.reduce((acc, r) => acc + r.stars, 0) / ratings.length;
           }
         }
-
         setStats({ requested: songs.length, sang, noshow, avgRating });
+      }
+
+      // Verificar si ganó el evento más reciente
+      const { data: lastWin } = await supabase
+        .from("event_winners")
+        .select("song_name, avg_rating, event_date, event_id")
+        .eq("user_id", auth.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastWin) {
+        const shownKey = `winner_toast_${lastWin.event_id}`;
+        if (!localStorage.getItem(shownKey)) {
+          setWinnerToast({
+            event_date: lastWin.event_date,
+            song: lastWin.song_name,
+            avg: lastWin.avg_rating,
+          });
+          localStorage.setItem(shownKey, "1");
+        }
       }
     };
     init();
@@ -264,6 +287,7 @@ export default function ProfilePage() {
         </button>
       </main>
 
+      {/* Toast guardado */}
       {toast && (
         <div
           className={clsx(
@@ -274,6 +298,44 @@ export default function ProfilePage() {
           )}
         >
           {toast.msg}
+        </div>
+      )}
+
+      {/* Winner toast */}
+      {winnerToast && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6">
+          <div className="card w-full max-w-sm text-center space-y-4 border-r-amber/40">
+            <div className="text-5xl">🏆</div>
+            <h2 className="font-display text-3xl tracking-wide text-r-amber">
+              ¡GANASTE!
+            </h2>
+            <p className="text-r-muted text-sm">
+              El{" "}
+              {new Date(winnerToast.event_date).toLocaleDateString("es-VE", {
+                day: "numeric",
+                month: "long",
+              })}
+              , cantaste{" "}
+              <span className="text-r-text font-medium">
+                {winnerToast.song}
+              </span>{" "}
+              y fuiste el mejor valorado de la noche con{" "}
+              <span className="text-r-amber font-semibold">
+                {Number(winnerToast.avg).toFixed(1)} ⭐
+              </span>
+            </p>
+            <p className="text-xs text-r-muted">
+              Toma un capture y dile a{" "}
+              <span className="text-r-text font-medium">Kako o KixKira</span>{" "}
+              que ganaste 🤘
+            </p>
+            <button
+              onClick={() => setWinnerToast(null)}
+              className="btn-primary"
+            >
+              ¡GENIAL!
+            </button>
+          </div>
         </div>
       )}
     </div>
