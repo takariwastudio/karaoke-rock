@@ -1097,7 +1097,11 @@ export default function AdminPage() {
                           ✓ Validada a las{" "}
                           {new Date(t.validated_at).toLocaleTimeString(
                             "es-VE",
-                            { hour: "2-digit", minute: "2-digit" },
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone: "America/Caracas",
+                            },
                           )}
                         </p>
                       )}

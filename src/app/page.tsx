@@ -106,10 +106,15 @@ export default function LoginPage() {
       if (sa && new Date(sa).getTime() > Date.now()) {
         setStartsAt(sa);
         setShowCountdown(true);
+      } else {
+        setStartsAt(null);
+        setShowCountdown(false);
       }
       setChecking(false);
     };
     check();
+    const t = setInterval(check, 30_000);
+    return () => clearInterval(t);
   }, []);
 
   const handleGoogle = async () => {

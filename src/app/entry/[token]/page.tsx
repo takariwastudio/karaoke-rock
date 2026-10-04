@@ -209,6 +209,7 @@ export default function EntryPage() {
                   {new Date(ticket.validated_at).toLocaleTimeString("es-VE", {
                     hour: "2-digit",
                     minute: "2-digit",
+                    timeZone: "America/Caracas",
                   })}
                 </span>
               </div>

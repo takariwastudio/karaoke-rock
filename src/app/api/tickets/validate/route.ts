@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     const usedAt = new Date(ticket.validated_at).toLocaleTimeString("es-VE", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "America/Caracas",
     });
     return NextResponse.json(
       {
