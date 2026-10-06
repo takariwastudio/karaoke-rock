@@ -134,12 +134,34 @@ export default function AdminPage() {
         .order("created_at", { ascending: true }),
     ]);
     if (evRes.event) {
+      // Auto-limpiar countdown si la fecha ya pasó
+      if (
+        evRes.event.starts_at &&
+        new Date(evRes.event.starts_at).getTime() < Date.now()
+      ) {
+        await fetch("/api/admin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-password": pw,
+          },
+          body: JSON.stringify({
+            action: "set_event_time",
+            event_id: evRes.event.id,
+            starts_at: null,
+          }),
+        });
+        evRes.event.starts_at = null;
+      }
+
       setEvent(evRes.event);
+
       if (!priceInitialized.current) {
         priceInitialized.current = true;
         setBsPrice(evRes.event.ticket_price_bs?.toString() || "");
         setUsdtPrice(evRes.event.ticket_price_usdt?.toString() || "5");
       }
+
       if (!dateInitialized.current) {
         dateInitialized.current = true;
         if (evRes.event.starts_at) {
@@ -288,7 +310,7 @@ export default function AdminPage() {
       return;
     }
     const rate = data.rate;
-    const usdtVal = event?.ticket_price_usdt ?? 5;
+    const usdtVal = parseFloat(usdtPrice) || event?.ticket_price_usdt || 5;
     const bsVal = Math.round(rate * usdtVal);
     await Promise.all([
       fetch("/api/admin", {
@@ -320,7 +342,7 @@ export default function AdminPage() {
   };
 
   const savePrecios = async () => {
-    await Promise.all([
+    const [r1, r2] = await Promise.all([
       fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-password": pw },
@@ -340,7 +362,19 @@ export default function AdminPage() {
         }),
       }),
     ]);
-    showToast("Precios guardados ✓");
+    if (r1.ok && r2.ok) {
+      priceInitialized.current = false;
+      await load();
+      showToast("Precios guardados ✓");
+    } else {
+      showToast("Error al guardar precios", "err");
+      console.error(
+        "r1:",
+        await r1.json().catch(() => ({})),
+        "r2:",
+        await r2.json().catch(() => ({})),
+      );
+    }
   };
 
   const approveTicket = async (ticket_id: string) => {
