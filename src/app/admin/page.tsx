@@ -74,6 +74,7 @@ function AdminLogin({ onLogin }: { onLogin: (pw: string) => void }) {
 export default function AdminPage() {
   const supabase = createClient();
   const [pw, setPw] = useState("");
+  const pwRef = useRef("");
   const [authed, setAuthed] = useState(false);
   const [event, setEvent] = useState<Event | null>(null);
   const [queue, setQueue] = useState<SongQueue[]>([]);
@@ -164,7 +165,10 @@ export default function AdminPage() {
 
       if (!dateInitialized.current) {
         dateInitialized.current = true;
-        if (evRes.event.starts_at) {
+        if (
+          evRes.event.starts_at &&
+          new Date(evRes.event.starts_at).getTime() > Date.now()
+        ) {
           const d = new Date(evRes.event.starts_at);
           const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
             .toISOString()
@@ -236,6 +240,10 @@ export default function AdminPage() {
       supabase.removeChannel(ch);
     };
   }, [authed, event, load, loadTickets, supabase]);
+
+  useEffect(() => {
+    pwRef.current = pw;
+  }, [pw]);
 
   const djAction = async (action: string, extra?: object) => {
     const res = await fetch("/api/admin", {
