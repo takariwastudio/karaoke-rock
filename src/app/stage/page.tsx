@@ -114,6 +114,25 @@ export default function StagePage() {
         { event: "*", schema: "public", table: "ratings" },
         () => loadData(eventId),
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "events" },
+        async () => {
+          // Nuevo evento creado — recargar todo
+          const { data: event } = await supabase
+            .from("events")
+            .select("id")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+          if (!event) return;
+          setEventId(event.id);
+          setQueue([]);
+          setRatings([]);
+          await loadData(event.id);
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
