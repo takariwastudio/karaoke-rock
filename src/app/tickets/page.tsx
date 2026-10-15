@@ -50,7 +50,7 @@ export default function TicketsPage() {
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
-    fetch("/api/admin/event")
+    fetch("/api/admin/event", { cache: "no-store" })
       .then((r) => r.json())
       .then(({ event }) => {
         if (event) setEvent(event);
