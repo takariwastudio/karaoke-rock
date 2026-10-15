@@ -8,24 +8,27 @@ const PAYMENT_INFO = {
   pago_movil: {
     label: "Pago Móvil",
     fields: [
-      { label: "Teléfono", value: "04127089438" },
-      { label: "Banco", value: "Banco de Venezuela" },
-      { label: "Cédula", value: "V-20452809" },
-      { label: "Nombre", value: "Oscar Machado" },
+      { label: "Teléfono", value: "04144686886" },
+      { label: "Banco", value: "Bancamiga - 0172" },
+      { label: "Cédula", value: "V-16132950" },
     ],
   },
   transferencia: {
     label: "Transferencia Bancaria",
     fields: [
-      { label: "Banco", value: "Banco de Venezuela" },
-      { label: "Cuenta", value: "01020378330000785024" },
-      { label: "Titular", value: "Oscar Machado" },
-      { label: "RIF/CI", value: "V-20452809" },
+      { label: "Banco", value: "Bancamiga - 0172" },
+      { label: "Tipo", value: "Cuenta Corriente Amiga" },
+      { label: "Cuenta", value: "01720203152038290595" },
+      { label: "Titular", value: "Ineska Morillo" },
+      { label: "Documento", value: "V-16132950" },
     ],
   },
   binance: {
-    label: "Binance Pay",
-    fields: [{ label: "Binance ID", value: "194102141" }],
+    label: "Binance / USDT",
+    fields: [
+      { label: "Wallet (TRC20)", value: "TDbPTQYp6n9xN5aYZ4jxWytnNtMtystngA" },
+      { label: "Binance ID", value: "1277504906" },
+    ],
   },
 };
 
@@ -185,10 +188,7 @@ export default function TicketsPage() {
               <span className="text-r-amber font-display text-xl">
                 {totalPrice}
               </span>
-              <span className="text-r-muted text-xs">
-                · incluye 🍺{" "}
-                {quantity > 1 ? `2 cervezas por persona` : "2 cervezas"}
-              </span>
+              <span className="text-r-muted text-xs">· entrada general</span>
             </div>
           </div>
         )}
@@ -323,8 +323,8 @@ export default function TicketsPage() {
               </div>
               {method === "binance" && (
                 <p className="text-xs text-r-amber">
-                  💡 Envía exactamente 5 USDT usando Binance Pay con el ID
-                  indicado.
+                  💡 Envía exactamente 3 USDT a la wallet TRC20 o usando el ID
+                  de Binance indicado.
                 </p>
               )}
             </div>

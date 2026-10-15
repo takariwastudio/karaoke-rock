@@ -192,16 +192,6 @@ export default function EntryPage() {
               <span style={{ color: "#888" }}>Cédula</span>
               <span style={{ color: "#f5f5f5" }}>{ticket.cedula}</span>
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: "#888" }}>Incluye</span>
-              <span style={{ color: "#f6bc3f" }}>🍺 2 cervezas</span>
-            </div>
             {isUsed && ticket.validated_at && (
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#888" }}>Validada a las</span>

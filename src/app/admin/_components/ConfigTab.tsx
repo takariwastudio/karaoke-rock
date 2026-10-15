@@ -151,7 +151,7 @@ export function ConfigTab({
         </div>
       </div>
 
-      {/* Precios */}
+      {/* Precio de entradas */}
       <div className="card lg:col-span-2">
         <h3 className="font-semibold mb-1 flex items-center gap-2">
           <Ticket size={15} className="text-r-purple" /> Precio de entradas
@@ -159,52 +159,99 @@ export function ConfigTab({
         <p className="text-xs text-r-muted mb-5">
           Configura los precios antes de abrir la venta
         </p>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Tasa BCV — entrada manual + botón auto */}
           <div>
-            <label className="label">Precio en Bolívares</label>
+            <label className="label">Tasa BCV (Bs/USD)</label>
             <div className="flex gap-2">
               <input
                 type="number"
                 step="0.01"
                 className="input flex-1"
-                placeholder="Ej: 36500"
-                value={bsPrice}
-                onChange={(e) => setBsPrice(e.target.value)}
+                placeholder="Ej: 62.50"
+                value={event.bcv_rate || ""}
+                onChange={(e) =>
+                  setEvent({
+                    ...event,
+                    bcv_rate: Number(e.target.value),
+                  })
+                }
               />
               <button
                 onClick={fetchBcv}
                 disabled={bcvLoading}
                 className="btn-ghost text-xs shrink-0 px-3"
+                title="Obtener tasa del BCV automáticamente"
               >
-                {bcvLoading ? "..." : "📡 BCV"}
+                {bcvLoading ? "..." : "📡 Auto"}
               </button>
             </div>
-            {event.bcv_rate > 0 && (
-              <p className="text-xs text-r-muted mt-1.5">
-                Tasa BCV: <span className="text-r-text">{event.bcv_rate}</span>{" "}
-                Bs/USD · {usdtPrice} USDT ≈{" "}
-                <span className="text-r-amber">
-                  {(parseFloat(usdtPrice) * event.bcv_rate).toLocaleString(
-                    "es-VE",
-                  )}{" "}
-                  Bs
-                </span>
-              </p>
-            )}
           </div>
+
+          {/* Precio en USDT */}
           <div>
-            <label className="label">
-              Precio en USDT (incluye 🍺 2 cervezas)
-            </label>
+            <label className="label">Precio en USDT</label>
             <input
               type="number"
               step="0.01"
               className="input"
-              value={usdtPrice}
-              onChange={(e) => setUsdtPrice(e.target.value)}
+              value={event.ticket_price_usdt || 5}
+              onChange={(e) => {
+                setEvent({
+                  ...event,
+                  ticket_price_usdt: Number(e.target.value),
+                });
+                setUsdtPrice(e.target.value);
+              }}
             />
           </div>
+
+          {/* Precio en Bolívares */}
+          <div className="sm:col-span-2">
+            <label className="label">Precio en Bolívares</label>
+            <input
+              type="number"
+              step="1"
+              className="input"
+              placeholder="Ej: 36500"
+              value={event.ticket_price_bs || ""}
+              onChange={(e) => {
+                setEvent({
+                  ...event,
+                  ticket_price_bs: Number(e.target.value),
+                });
+                setBsPrice(e.target.value);
+              }}
+            />
+            {event.bcv_rate > 0 && event.ticket_price_usdt > 0 && (
+              <p className="text-xs text-r-muted mt-1.5 flex items-center gap-2">
+                <span>
+                  {event.ticket_price_usdt} USDT × {event.bcv_rate} Bs ={" "}
+                  <span className="text-r-amber">
+                    {(event.ticket_price_usdt * event.bcv_rate).toLocaleString(
+                      "es-VE",
+                    )}{" "}
+                    Bs
+                  </span>
+                </span>
+                <button
+                  className="text-r-purple underline text-xs"
+                  onClick={() => {
+                    const calc = Math.round(
+                      event.ticket_price_usdt * event.bcv_rate,
+                    );
+                    setEvent({ ...event, ticket_price_bs: calc });
+                    setBsPrice(calc.toString());
+                  }}
+                >
+                  usar
+                </button>
+              </p>
+            )}
+          </div>
         </div>
+
         <button className="btn-ghost mt-5 w-full" onClick={savePrecios}>
           Guardar precios
         </button>

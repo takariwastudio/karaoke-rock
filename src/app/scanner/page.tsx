@@ -267,15 +267,6 @@ export default function ScannerPage() {
                       </p>
                     </>
                   )}
-                  <p
-                    style={{
-                      color: "rgba(255,255,255,0.7)",
-                      fontSize: 12,
-                      marginTop: 12,
-                    }}
-                  >
-                    🍺 Incluye 2 cervezas
-                  </p>
                 </>
               ) : result.reason === "already_used" ? (
                 <>

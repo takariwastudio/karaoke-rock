@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Método de pago</td><td style="color:#f5f5f5;text-align:right;">${methodLabel}</td></tr>
         <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Monto</td><td style="color:#f5f5f5;text-align:right;">${ticket.payment_amount} ${ticket.payment_currency}</td></tr>
         <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Referencia</td><td style="color:#f5f5f5;text-align:right;">${ticket.payment_ref}</td></tr>
-        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Incluye</td><td style="color:#f6bc3f;text-align:right;">🍺 2 cervezas</td></tr>
+        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Entradas</td><td style="color:#f5f5f5;text-align:right;">${ticket.quantity || 1} persona${(ticket.quantity || 1) > 1 ? "s" : ""}</td></tr>
       </table>
     </div>
   </div>
