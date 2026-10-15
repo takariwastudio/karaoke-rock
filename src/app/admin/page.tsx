@@ -130,7 +130,9 @@ export default function AdminPage() {
 
   const load = useCallback(async () => {
     const [evRes, qRes, rRes, uRes] = await Promise.all([
-      fetch("/api/admin/event", { cache: "no-store" }).then((r) => r.json()),
+      fetch(`/api/admin/event?_=${Date.now()}`, { cache: "no-store" }).then(
+        (r) => r.json(),
+      ),
       supabase
         .from("song_queue")
         .select("*, profiles!user_id(name, avatar_url)")
