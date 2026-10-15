@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const db = createServiceClient();
 
@@ -10,7 +12,9 @@ export async function GET() {
     .select("user_id, id, profiles!user_id(name, avatar_url)")
     .eq("status", "done");
 
-  const { data: ratings } = await db.from("ratings").select("*");
+  const { data: ratings } = await db
+    .from("ratings")
+    .select("song_queue_id, stars");
 
   const { data: winners } = await db
     .from("event_winners")

@@ -1,36 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
+import { z } from "zod";
+import { isAdmin, unauthorized } from "@/lib/security/admin-session";
+import { decryptTicket } from "@/lib/security/crypto";
+import { escapeHtml as h, parseBody, uuid } from "@/lib/security/validate";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-function isAdmin(req: NextRequest) {
-  return req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
-}
-
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req))
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const { ticket_id } = await req.json();
+  if (!isAdmin(req)) return unauthorized();
+  const body = await parseBody(req, z.object({ ticket_id: uuid }));
+  if ("error" in body) return body.error;
+  const { ticket_id } = body.data;
   const db = createServiceClient();
 
-  const { data: ticket } = await db
+  const { data: row } = await db
     .from("tickets")
     .select("*, events(name, date)")
     .eq("id", ticket_id)
     .single();
-  if (!ticket)
+  if (!row)
     return NextResponse.json(
       { error: "Ticket no encontrado" },
       { status: 404 },
     );
-  if (ticket.status !== "pending")
+  if (row.status !== "pending")
     return NextResponse.json({ error: "Ya procesado" }, { status: 409 });
+  const ticket = decryptTicket(row);
 
-  await db
+  const { data: updated } = await db
     .from("tickets")
     .update({ status: "approved", approved_at: new Date().toISOString() })
-    .eq("id", ticket_id);
+    .eq("id", ticket_id)
+    .eq("status", "pending")
+    .select("id");
+  if (!updated?.length)
+    return NextResponse.json({ error: "Ya procesado" }, { status: 409 });
 
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL || "https://karaokerock.com.ve";
@@ -68,23 +74,23 @@ export async function POST(req: NextRequest) {
       <p style="color:#fff;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin:0;">✓ Entrada Confirmada</p>
     </div>
     <div style="padding:24px;">
-      <h2 style="color:#f5f5f5;font-size:22px;margin:0 0 4px;">${ticket.name}</h2>
-      <p style="color:#888;font-size:13px;margin:0 0 20px;text-transform:capitalize;">${eventDate}</p>
+      <h2 style="color:#f5f5f5;font-size:22px;margin:0 0 4px;">${h(ticket.name)}</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 20px;text-transform:capitalize;">${h(eventDate)}</p>
       <div style="background:#f5f5f5;border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
-        <img src="${qrImgUrl}" width="220" height="220" alt="QR de entrada" style="display:block;margin:0 auto;"/>
+        <img src="${h(qrImgUrl)}" width="220" height="220" alt="QR de entrada" style="display:block;margin:0 auto;"/>
         <p style="color:#1a1a1a;font-size:10px;margin:10px 0 0;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Presenta este código en la entrada</p>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Cédula</td><td style="color:#f5f5f5;text-align:right;">${ticket.cedula}</td></tr>
+        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Cédula</td><td style="color:#f5f5f5;text-align:right;">${h(ticket.cedula)}</td></tr>
         <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Método de pago</td><td style="color:#f5f5f5;text-align:right;">${methodLabel}</td></tr>
-        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Monto</td><td style="color:#f5f5f5;text-align:right;">${ticket.payment_amount} ${ticket.payment_currency}</td></tr>
-        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Referencia</td><td style="color:#f5f5f5;text-align:right;">${ticket.payment_ref}</td></tr>
-        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Entradas</td><td style="color:#f5f5f5;text-align:right;">${ticket.quantity || 1} persona${(ticket.quantity || 1) > 1 ? "s" : ""}</td></tr>
+        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Monto</td><td style="color:#f5f5f5;text-align:right;">${h(ticket.payment_amount)} ${h(ticket.payment_currency)}</td></tr>
+        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Referencia</td><td style="color:#f5f5f5;text-align:right;">${h(ticket.payment_ref)}</td></tr>
+        <tr style="border-top:1px solid #2e2e2e;"><td style="color:#888;padding:8px 0;">Entradas</td><td style="color:#f5f5f5;text-align:right;">${Number(ticket.quantity) || 1} persona${(Number(ticket.quantity) || 1) > 1 ? "s" : ""}</td></tr>
       </table>
     </div>
   </div>
   <div style="text-align:center;margin-top:24px;">
-    <a href="${entryUrl}" style="display:inline-block;background:#e63c23;color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:14px;letter-spacing:2px;">VER MI ENTRADA</a>
+    <a href="${h(entryUrl)}" style="display:inline-block;background:#e63c23;color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:14px;letter-spacing:2px;">VER MI ENTRADA</a>
   </div>
   <p style="color:#444;font-size:11px;text-align:center;margin-top:20px;line-height:1.8;">No compartas este QR.<br>Una vez validado en la puerta, no podrá ser reutilizado.</p>
 </div></body></html>`,

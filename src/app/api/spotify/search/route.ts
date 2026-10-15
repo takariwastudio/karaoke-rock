@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/security/user";
+import { rateLimit } from "@/lib/security/rate-limit";
 
 let token: { value: string; expires: number } | null = null;
 
@@ -23,8 +25,15 @@ async function getToken() {
   return token.value;
 }
 
+// Solo usuarios logueados: evita que terceros usen nuestra cuota de Spotify
 export async function GET(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get("q");
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+
+  const limited = rateLimit(req, "spotify", 60, 60_000, auth.user.id);
+  if (limited) return limited;
+
+  const q = req.nextUrl.searchParams.get("q")?.trim().slice(0, 100);
   if (!q || q.length < 2) return NextResponse.json({ tracks: [] });
 
   try {

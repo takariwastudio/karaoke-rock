@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isAdmin, unauthorized } from "@/lib/security/admin-session";
+import { decrypt } from "@/lib/security/crypto";
+import { cleanText, parseBody, uuid } from "@/lib/security/validate";
 
-function isAdmin(req: NextRequest) {
-  return req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
-}
+const schema = z.object({
+  token: uuid,
+  validated_by: cleanText(50).optional(),
+});
 
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req))
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const { token, validated_by } = await req.json();
-  if (!token)
-    return NextResponse.json({ error: "Token requerido" }, { status: 400 });
+  if (!isAdmin(req)) return unauthorized();
+  const body = await parseBody(req, schema);
+  if ("error" in body) return body.error;
+  const { token, validated_by } = body.data;
 
   const db = createServiceClient();
   const { data: ticket } = await db
     .from("tickets")
-    .select("*")
+    .select("id, name, cedula, status, validated_at, validated_by")
     .eq("token", token)
     .single();
 
@@ -24,6 +28,8 @@ export async function POST(req: NextRequest) {
       { valid: false, reason: "not_found", message: "QR no reconocido" },
       { status: 404 },
     );
+
+  const info = { name: ticket.name, cedula: decrypt(ticket.cedula) };
 
   if (ticket.status === "used") {
     const usedAt = new Date(ticket.validated_at).toLocaleTimeString("es-VE", {
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
         message: "Esta entrada ya fue usada",
         usedAt,
         validated_by: ticket.validated_by,
-        ticket: { name: ticket.name, cedula: ticket.cedula },
+        ticket: info,
       },
       { status: 409 },
     );
@@ -60,19 +66,32 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
 
-  // approved → validate
-  await db
+  // approved → validate (condición en el UPDATE evita doble uso concurrente)
+  const { data: updated } = await db
     .from("tickets")
     .update({
       status: "used",
       validated_at: new Date().toISOString(),
       validated_by: validated_by || "scanner",
     })
-    .eq("id", ticket.id);
+    .eq("id", ticket.id)
+    .eq("status", "approved")
+    .select("id");
+
+  if (!updated?.length)
+    return NextResponse.json(
+      {
+        valid: false,
+        reason: "already_used",
+        message: "Esta entrada ya fue usada",
+        ticket: info,
+      },
+      { status: 409 },
+    );
 
   return NextResponse.json({
     valid: true,
     message: "¡Entrada válida!",
-    ticket: { name: ticket.name, cedula: ticket.cedula, email: ticket.email },
+    ticket: info,
   });
 }

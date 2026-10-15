@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { isAdmin, unauthorized } from "@/lib/security/admin-session";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAdmin(req)) return unauthorized();
+
   // Fuente 1: DolarAPI (API venezolana confiable)
   try {
     const res = await fetch("https://ve.dolarapi.com/v1/dolares/oficial", {

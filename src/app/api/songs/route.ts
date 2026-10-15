@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/security/user";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { escapeLike, parseBody, songSchema } from "@/lib/security/validate";
 
 async function getActiveEvent(db: ReturnType<typeof createServiceClient>) {
   const { data } = await db
@@ -20,7 +23,9 @@ export async function GET() {
 
   const { data: songs } = await db
     .from("song_queue")
-    .select("*, profiles!user_id(name, avatar_url)")
+    .select(
+      "id, event_id, user_id, artist, song_name, spotify_track_id, album_art, status, requested_at, started_at, finished_at, profiles!user_id(name, avatar_url)",
+    )
     .eq("event_id", event.id)
     .in("status", ["waiting", "singing", "done"])
     .order("requested_at", { ascending: true });
@@ -29,10 +34,16 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { artist, song_name, spotify_track_id, album_art, user_id } =
-    await req.json();
-  if (!artist || !song_name || !user_id)
-    return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const user_id = auth.user.id;
+
+  const limited = rateLimit(req, "songs", 10, 60_000, user_id);
+  if (limited) return limited;
+
+  const body = await parseBody(req, songSchema);
+  if ("error" in body) return body.error;
+  const { artist, song_name, spotify_track_id, album_art } = body.data;
 
   const db = createServiceClient();
   const event = await getActiveEvent(db);
@@ -44,7 +55,7 @@ export async function POST(req: NextRequest) {
     .select("is_banned")
     .eq("id", user_id)
     .single();
-  if (profile?.is_banned)
+  if (!profile || profile.is_banned)
     return NextResponse.json({ error: "Cuenta suspendida" }, { status: 403 });
 
   // Cooldown
@@ -74,8 +85,8 @@ export async function POST(req: NextRequest) {
     .from("song_queue")
     .select("id")
     .eq("event_id", event.id)
-    .ilike("song_name", song_name.trim())
-    .ilike("artist", artist.trim())
+    .ilike("song_name", escapeLike(song_name))
+    .ilike("artist", escapeLike(artist))
     .not("status", "eq", "removed")
     .limit(1)
     .single();
@@ -98,10 +109,12 @@ export async function POST(req: NextRequest) {
       user_id,
       artist,
       song_name,
-      spotify_track_id,
-      album_art,
+      spotify_track_id: spotify_track_id ?? null,
+      album_art: album_art ?? null,
     })
-    .select("*, profiles!user_id(name, avatar_url)")
+    .select(
+      "id, event_id, user_id, artist, song_name, spotify_track_id, album_art, status, requested_at, profiles!user_id(name, avatar_url)",
+    )
     .single();
 
   if (error)

@@ -74,7 +74,6 @@ export function PedirTab({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: userId,
           artist: selected.artist,
           song_name: selected.name,
           spotify_track_id: selected.id,
@@ -101,7 +100,6 @@ export function PedirTab({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: userId,
           artist: selected.artist,
           song_name: selected.name,
           spotify_track_id: selected.id,

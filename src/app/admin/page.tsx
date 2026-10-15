@@ -19,23 +19,27 @@ import { EntradasTab } from "./_components/EntradasTab";
 import { ConfigTab } from "./_components/ConfigTab";
 import type { Profile, SongQueue, Rating, Event } from "@/lib/types";
 
-const ADMIN_KEY = "kr_admin";
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
-function AdminLogin({ onLogin }: { onLogin: (pw: string) => void }) {
+function AdminLogin({ onLogin }: { onLogin: () => void }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const submit = async () => {
-    const res = await fetch("/api/admin", {
+    const res = await fetch("/api/admin/session", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": pw },
-      body: JSON.stringify({ action: "ping", event_id: "" }),
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ password: pw }),
     });
-    if (res.status === 401) {
-      setErr("Password incorrecto");
+    if (!res.ok) {
+      setErr(
+        res.status === 429
+          ? "Demasiados intentos. Espera unos minutos."
+          : "Password incorrecto",
+      );
       return;
     }
-    sessionStorage.setItem(ADMIN_KEY, pw);
-    onLogin(pw);
+    setPw("");
+    onLogin();
   };
   return (
     <div className="min-h-screen bg-r-bg flex items-center justify-center p-6">
@@ -73,9 +77,8 @@ function AdminLogin({ onLogin }: { onLogin: (pw: string) => void }) {
 
 export default function AdminPage() {
   const supabase = createClient();
-  const [pw, setPw] = useState("");
-  const pwRef = useRef("");
   const [authed, setAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [event, setEvent] = useState<Event | null>(null);
   const [queue, setQueue] = useState<SongQueue[]>([]);
   const [ratings, setRatings] = useState<Rating[]>([]);
@@ -113,20 +116,19 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // ── Restaurar sesión desde sessionStorage ────────────────
+  // ── Restaurar sesión (cookie HttpOnly) ───────────────────
   useEffect(() => {
-    const stored = sessionStorage.getItem(ADMIN_KEY);
-    if (stored) {
-      pwRef.current = stored; // sincrónicamente, antes del render
-      setPw(stored);
-      setAuthed(true);
-    }
+    fetch("/api/admin/session", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setAuthed(!!d.authed))
+      .catch(() => setAuthed(false))
+      .finally(() => setChecking(false));
   }, []);
 
-  // ── Mantener pwRef sincronizado con pw ───────────────────
-  useEffect(() => {
-    pwRef.current = pw;
-  }, [pw]);
+  const logout = async () => {
+    await fetch("/api/admin/session", { method: "DELETE" });
+    setAuthed(false);
+  };
 
   const load = useCallback(async () => {
     const [evRes, qRes, rRes, uRes] = await Promise.all([
@@ -152,10 +154,7 @@ export default function AdminPage() {
       ) {
         await fetch("/api/admin", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-admin-password": pwRef.current, // ← pwRef
-          },
+          headers: JSON_HEADERS,
           body: JSON.stringify({
             action: "set_event_time",
             event_id: evRes.event.id,
@@ -198,12 +197,17 @@ export default function AdminPage() {
 
   const loadTickets = useCallback(async () => {
     if (!event) return;
-    const res = await fetch(`/api/tickets?event_id=${event.id}`, {
-      headers: { "x-admin-password": pwRef.current }, // ← pwRef, sin pw en deps
-    });
+    const res = await fetch(
+      `/api/tickets?event_id=${encodeURIComponent(event.id)}`,
+      { cache: "no-store" },
+    );
+    if (res.status === 401) {
+      setAuthed(false);
+      return;
+    }
     const data = await res.json();
     if (data.tickets) setTickets(data.tickets);
-  }, [event]); // ← pw eliminado de deps
+  }, [event]);
 
   const loadHistorical = useCallback(async () => {
     const res = await fetch("/api/rankings");
@@ -241,29 +245,27 @@ export default function AdminPage() {
         { event: "*", schema: "public", table: "profiles" },
         load,
       )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tickets" },
-        loadTickets,
-      )
       .subscribe();
+    // tickets tiene datos personales y RLS lo bloquea para el cliente:
+    // se consulta vía API admin cada 20 s en lugar de Realtime
+    const t = setInterval(loadTickets, 20_000);
     return () => {
       supabase.removeChannel(ch);
+      clearInterval(t);
     };
   }, [authed, event, load, loadTickets, supabase]);
 
   const djAction = async (action: string, extra?: object) => {
     const res = await fetch("/api/admin", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-password": pwRef.current, // ← pwRef
-      },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ action, event_id: event?.id, ...extra }),
     });
     if (!res.ok) {
-      if (res.status === 401)
-        showToast("Password incorrecto o sesión expirada.", "err");
+      if (res.status === 401) {
+        showToast("Sesión expirada. Vuelve a entrar.", "err");
+        setAuthed(false);
+      }
       return;
     }
     await load();
@@ -276,10 +278,7 @@ export default function AdminPage() {
     }
     const res = await fetch("/api/admin", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-password": pwRef.current, // ← pwRef
-      },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         action: "set_cooldown",
         event_id: event.id,
@@ -304,10 +303,7 @@ export default function AdminPage() {
         : null;
     const res = await fetch("/api/admin", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-password": pwRef.current, // ← pwRef
-      },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         action: "set_event_time",
         event_id: event.id,
@@ -354,10 +350,7 @@ export default function AdminPage() {
     const [r1, r2, r3] = await Promise.all([
       fetch("/api/admin", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": pwRef.current,
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           action: "set_ticket_price_bs",
           event_id: event.id,
@@ -366,10 +359,7 @@ export default function AdminPage() {
       }),
       fetch("/api/admin", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": pwRef.current,
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           action: "set_ticket_price_usdt",
           event_id: event.id,
@@ -378,10 +368,7 @@ export default function AdminPage() {
       }),
       fetch("/api/admin", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": pwRef.current,
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           action: "set_bcv_rate",
           event_id: event.id,
@@ -421,10 +408,7 @@ export default function AdminPage() {
   const approveTicket = async (ticket_id: string) => {
     const res = await fetch("/api/tickets/approve", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-password": pwRef.current, // ← pwRef
-      },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ ticket_id }),
     });
     if (res.ok) {
@@ -436,10 +420,7 @@ export default function AdminPage() {
   const rejectTicket = async (ticket_id: string, reason: string) => {
     const res = await fetch("/api/tickets/reject", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-password": pwRef.current, // ← pwRef
-      },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ ticket_id, reason }),
     });
     if (res.ok) {
@@ -461,10 +442,7 @@ export default function AdminPage() {
     setClosing(true);
     const res = await fetch("/api/admin/close-night", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-password": pwRef.current, // ← pwRef
-      },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ event_id: event.id }),
     });
     const data = await res.json();
@@ -478,16 +456,14 @@ export default function AdminPage() {
     } else showToast(`Error: ${data.error}`, "err");
   };
 
-  if (!authed)
+  if (checking)
     return (
-      <AdminLogin
-        onLogin={(p) => {
-          pwRef.current = p; // sincrónicamente antes del render
-          setPw(p);
-          setAuthed(true);
-        }}
-      />
+      <div className="min-h-screen bg-r-bg flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-r-red border-t-transparent rounded-full animate-spin" />
+      </div>
     );
+
+  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
 
   const singing = queue.find((e) => e.status === "singing") ?? null;
   const waiting = queue.filter((e) => e.status === "waiting");
@@ -515,10 +491,7 @@ export default function AdminPage() {
             <RefreshCw size={15} />
           </button>
           <button
-            onClick={() => {
-              sessionStorage.removeItem(ADMIN_KEY);
-              setAuthed(false);
-            }}
+            onClick={logout}
             className="text-xs text-r-muted hover:text-r-text border border-r-border rounded-lg px-2 py-1"
           >
             Salir

@@ -2,3 +2,12 @@ node_modules/
 .next/
 .DS_Store
 *.log
+tsconfig.tsbuildinfo
+
+# Secretos — nunca versionar
+.env
+.env*.local
+.env.development
+.env.production
+*.pem
+!.env.example

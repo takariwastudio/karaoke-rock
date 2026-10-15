@@ -19,8 +19,14 @@ export default function ScannerPage() {
   const [ready, setReady] = useState(false);
   const scannerRef = useRef<any>(null);
   const processingRef = useRef(false);
-  const pwRef = useRef(pw);
-  pwRef.current = pw;
+
+  // Reusar sesión admin existente (cookie HttpOnly)
+  useEffect(() => {
+    fetch("/api/admin/session", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.authed && setAuthed(true))
+      .catch(() => {});
+  }, []);
 
   const startScanner = useCallback(async () => {
     const { Html5Qrcode } = await import("html5-qrcode");
@@ -54,13 +60,15 @@ export default function ScannerPage() {
         try {
           const res = await fetch("/api/tickets/validate", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-admin-password": pwRef.current,
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token, validated_by: "scanner" }),
           });
           const data = await res.json();
+          if (res.status === 401) {
+            setAuthed(false);
+            processingRef.current = false;
+            return;
+          }
           setResult(data);
         } catch {
           setResult({ valid: false, message: "Error de conexión" });
@@ -85,15 +93,20 @@ export default function ScannerPage() {
   }, [authed, startScanner]);
 
   const login = async () => {
-    const res = await fetch("/api/admin", {
+    const res = await fetch("/api/admin/session", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": pw },
-      body: JSON.stringify({ action: "ping", event_id: "" }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw }),
     });
-    if (res.status === 401) {
-      setAuthError("Password incorrecto");
+    if (!res.ok) {
+      setAuthError(
+        res.status === 429
+          ? "Demasiados intentos. Espera unos minutos."
+          : "Password incorrecto",
+      );
       return;
     }
+    setPw("");
     setAuthed(true);
   };
 

@@ -48,6 +48,9 @@ export default function TicketsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  // Anti-bots: campo oculto que un humano nunca llena + hora de inicio del formulario
+  const [website, setWebsite] = useState("");
+  const [startedAt] = useState(() => Date.now());
 
   useEffect(() => {
     fetch("/api/admin/event", { cache: "no-store" })
@@ -101,12 +104,27 @@ export default function TicketsPage() {
         payment_method: method,
         event_id: event.id,
         quantity,
+        website,
+        form_started_at: startedAt,
       }),
     });
     const data = await res.json();
     setSubmitting(false);
     if (!res.ok) {
-      setErrors({ payment_ref: data.error || "Error al enviar" });
+      const fieldMsg: Record<string, string> = {
+        name: "Nombre inválido",
+        email: "Email inválido",
+        phone: "Teléfono inválido",
+        cedula: "Cédula inválida (ej. V-12345678)",
+      };
+      if (data.field in fieldMsg) {
+        setErrors({ [data.field]: fieldMsg[data.field] });
+        setStep("form");
+      } else if (data.field === "payment_ref") {
+        setErrors({ payment_ref: "Referencia inválida (solo letras y números)" });
+      } else {
+        setErrors({ payment_ref: data.error || "Error al enviar" });
+      }
       return;
     }
     setStep("success");
@@ -197,6 +215,16 @@ export default function TicketsPage() {
           <>
             <div className="card space-y-4">
               <h3 className="font-semibold">Tus datos</h3>
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute -left-[9999px] h-0 w-0 opacity-0"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+              />
               {[
                 {
                   k: "name",

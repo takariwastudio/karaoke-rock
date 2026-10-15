@@ -10,7 +10,7 @@ App web demo para el evento Karaoke Rock de Maracay. Todo corre en el navegador,
 | `/home`   | Usuarios           | Pedir canción, calificar, ver la lista  |
 | `/admin`  | DJ / Host          | Panel de control completo               |
 
-**Password de admin:** `rockadmin`
+**Password de admin:** se configura con `ADMIN_PASSWORD_HASH` (ver `.env.example`).
 
 ---
 

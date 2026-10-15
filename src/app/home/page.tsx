@@ -82,18 +82,7 @@ export default function HomePage() {
         .eq("id", authUser.id)
         .single();
       if (!profile) {
-        await fetch("/api/auth/create-profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: authUser.id,
-            name:
-              authUser.user_metadata?.full_name ||
-              authUser.email?.split("@")[0] ||
-              "Usuario",
-            avatar_url: authUser.user_metadata?.avatar_url || null,
-          }),
-        });
+        await fetch("/api/auth/create-profile", { method: "POST" });
         const { data: retried } = await supabase
           .from("profiles")
           .select("*")
@@ -223,7 +212,7 @@ export default function HomePage() {
     await fetch("/api/ratings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ song_queue_id, rater_id: user.id, stars }),
+      body: JSON.stringify({ song_queue_id, stars }),
     });
   };
 

@@ -1,0 +1,20 @@
+name: Security audit
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: "0 12 * * 1"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      # Falla si hay vulnerabilidades altas o críticas en dependencias de producción
+      - run: npm audit --omit=dev --audit-level=high
