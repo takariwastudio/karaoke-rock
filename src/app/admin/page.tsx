@@ -390,9 +390,29 @@ export default function AdminPage() {
       }),
     ]);
     if (r1.ok && r2.ok && r3.ok) {
-      priceInitialized.current = false;
-      await load();
+      // Update state directly from the values just saved — no re-fetch needed.
+      // This avoids Supabase read-replica lag and race conditions with the
+      // priceInitialized ref resetting prices before load() returns.
+      const savedBs = parseFloat(bsPrice);
+      const savedUsdt = parseFloat(usdtPrice);
+      const savedBcv = parseFloat(bcvRate) || 0;
+      setBsPrice(savedBs.toString());
+      setUsdtPrice(savedUsdt.toString());
+      setBcvRate(savedBcv.toString());
+      setEvent((ev) =>
+        ev
+          ? {
+              ...ev,
+              ticket_price_bs: savedBs,
+              ticket_price_usdt: savedUsdt,
+              bcv_rate: savedBcv,
+            }
+          : ev,
+      );
       showToast("Precios guardados ✓");
+      // Fire-and-forget load for queue/other data.
+      // priceInitialized stays true so load() won't overwrite our prices.
+      load();
     } else {
       showToast("Error al guardar precios", "err");
     }
