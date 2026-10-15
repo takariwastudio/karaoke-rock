@@ -11,6 +11,8 @@ interface ConfigTabProps {
   setBsPrice: (p: string) => void;
   usdtPrice: string;
   setUsdtPrice: (p: string) => void;
+  bcvRate: string;
+  setBcvRate: (p: string) => void;
   bcvLoading: boolean;
   closing: boolean;
   queue: SongQueue[];
@@ -31,6 +33,8 @@ export function ConfigTab({
   setBsPrice,
   usdtPrice,
   setUsdtPrice,
+  bcvRate,
+  setBcvRate,
   bcvLoading,
   closing,
   queue,
@@ -170,13 +174,8 @@ export function ConfigTab({
                 step="0.01"
                 className="input flex-1"
                 placeholder="Ej: 62.50"
-                value={event.bcv_rate || ""}
-                onChange={(e) =>
-                  setEvent({
-                    ...event,
-                    bcv_rate: Number(e.target.value),
-                  })
-                }
+                value={bcvRate}
+                onChange={(e) => setBcvRate(e.target.value)}
               />
               <button
                 onClick={fetchBcv}
@@ -196,14 +195,8 @@ export function ConfigTab({
               type="number"
               step="0.01"
               className="input"
-              value={event.ticket_price_usdt || 5}
-              onChange={(e) => {
-                setEvent({
-                  ...event,
-                  ticket_price_usdt: Number(e.target.value),
-                });
-                setUsdtPrice(e.target.value);
-              }}
+              value={usdtPrice}
+              onChange={(e) => setUsdtPrice(e.target.value)}
             />
           </div>
 
@@ -215,35 +208,29 @@ export function ConfigTab({
               step="1"
               className="input"
               placeholder="Ej: 36500"
-              value={event.ticket_price_bs || ""}
-              onChange={(e) => {
-                setEvent({
-                  ...event,
-                  ticket_price_bs: Number(e.target.value),
-                });
-                setBsPrice(e.target.value);
-              }}
+              value={bsPrice}
+              onChange={(e) => setBsPrice(e.target.value)}
             />
-            {event.bcv_rate > 0 && event.ticket_price_usdt > 0 && (
+            {parseFloat(bcvRate) > 0 && parseFloat(usdtPrice) > 0 && (
               <p className="text-xs text-r-muted mt-1.5 flex items-center gap-2">
                 <span>
-                  {event.ticket_price_usdt} USDT × {event.bcv_rate} Bs ={" "}
+                  {usdtPrice} USDT × {bcvRate} Bs ={" "}
                   <span className="text-r-amber">
-                    {(event.ticket_price_usdt * event.bcv_rate).toLocaleString(
-                      "es-VE",
-                    )}{" "}
+                    {(
+                      parseFloat(usdtPrice) * parseFloat(bcvRate)
+                    ).toLocaleString("es-VE")}{" "}
                     Bs
                   </span>
                 </span>
                 <button
                   className="text-r-purple underline text-xs"
-                  onClick={() => {
-                    const calc = Math.round(
-                      event.ticket_price_usdt * event.bcv_rate,
-                    );
-                    setEvent({ ...event, ticket_price_bs: calc });
-                    setBsPrice(calc.toString());
-                  }}
+                  onClick={() =>
+                    setBsPrice(
+                      Math.round(
+                        parseFloat(usdtPrice) * parseFloat(bcvRate),
+                      ).toString(),
+                    )
+                  }
                 >
                   usar
                 </button>

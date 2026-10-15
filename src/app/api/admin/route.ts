@@ -132,22 +132,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     case "set_ticket_price_bs": {
-      const { error } = await db
+      const { error, data } = await db
         .from("events")
         .update({ ticket_price_bs })
-        .eq("id", event_id);
+        .eq("id", event_id)
+        .select("id, ticket_price_bs");
       if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, updated: data });
     }
     case "set_ticket_price_usdt": {
-      const { error } = await db
+      const { error, data } = await db
         .from("events")
         .update({ ticket_price_usdt })
-        .eq("id", event_id);
+        .eq("id", event_id)
+        .select("id, ticket_price_usdt");
       if (error)
         return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, updated: data });
     }
     default:
       return NextResponse.json(

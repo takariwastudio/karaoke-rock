@@ -100,6 +100,7 @@ export default function AdminPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [bsPrice, setBsPrice] = useState("");
   const [usdtPrice, setUsdtPrice] = useState("5");
+  const [bcvRate, setBcvRate] = useState("");
   const [closing, setClosing] = useState(false);
   const [historical, setHistorical] = useState<any[]>([]);
   const [histWinners, setHistWinners] = useState<any[]>([]);
@@ -129,7 +130,7 @@ export default function AdminPage() {
 
   const load = useCallback(async () => {
     const [evRes, qRes, rRes, uRes] = await Promise.all([
-      fetch("/api/admin/event").then((r) => r.json()),
+      fetch("/api/admin/event", { cache: "no-store" }).then((r) => r.json()),
       supabase
         .from("song_queue")
         .select("*, profiles!user_id(name, avatar_url)")
@@ -168,6 +169,7 @@ export default function AdminPage() {
         priceInitialized.current = true;
         setBsPrice(evRes.event.ticket_price_bs?.toString() || "");
         setUsdtPrice(evRes.event.ticket_price_usdt?.toString() || "5");
+        setBcvRate(evRes.event.bcv_rate?.toString() || "");
       }
 
       if (!dateInitialized.current) {
@@ -330,34 +332,9 @@ export default function AdminPage() {
       return;
     }
     const rate = data.rate;
-    const usdtVal = parseFloat(usdtPrice) || event?.ticket_price_usdt || 5;
+    const usdtVal = parseFloat(usdtPrice) || 5;
     const bsVal = Math.round(rate * usdtVal);
-    await Promise.all([
-      fetch("/api/admin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": pwRef.current, // ← pwRef
-        },
-        body: JSON.stringify({
-          action: "set_bcv_rate",
-          event_id: event?.id,
-          bcv_rate: rate,
-        }),
-      }),
-      fetch("/api/admin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": pwRef.current, // ← pwRef
-        },
-        body: JSON.stringify({
-          action: "set_ticket_price_bs",
-          event_id: event?.id,
-          ticket_price_bs: bsVal,
-        }),
-      }),
-    ]);
+    setBcvRate(rate.toString());
     setBsPrice(bsVal.toString());
     setEvent((ev) =>
       ev ? { ...ev, bcv_rate: rate, ticket_price_bs: bsVal } : ev,
@@ -406,7 +383,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "set_bcv_rate",
           event_id: event.id,
-          bcv_rate: event.bcv_rate ?? 0,
+          bcv_rate: parseFloat(bcvRate) || 0,
         }),
       }),
     ]);
@@ -416,14 +393,6 @@ export default function AdminPage() {
       showToast("Precios guardados ✓");
     } else {
       showToast("Error al guardar precios", "err");
-      console.error(
-        "r1:",
-        await r1.json().catch(() => ({})),
-        "r2:",
-        await r2.json().catch(() => ({})),
-        "r3:",
-        await r3.json().catch(() => ({})),
-      );
     }
   };
 
@@ -659,6 +628,8 @@ export default function AdminPage() {
             setBsPrice={setBsPrice}
             usdtPrice={usdtPrice}
             setUsdtPrice={setUsdtPrice}
+            bcvRate={bcvRate}
+            setBcvRate={setBcvRate}
             bcvLoading={bcvLoading}
             closing={closing}
             queue={queue}
