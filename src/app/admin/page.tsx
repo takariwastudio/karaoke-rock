@@ -18,6 +18,7 @@ import { UsuariosTab } from "./_components/UsuariosTab";
 import { EntradasTab } from "./_components/EntradasTab";
 import { ConfigTab } from "./_components/ConfigTab";
 import type { Profile, SongQueue, Rating, Event } from "@/lib/types";
+import { round2, formatBs } from "@/lib/money";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -168,9 +169,12 @@ export default function AdminPage() {
 
       if (!priceInitialized.current) {
         priceInitialized.current = true;
-        setBsPrice(evRes.event.ticket_price_bs?.toString() || "");
-        setUsdtPrice(evRes.event.ticket_price_usdt?.toString() || "5");
-        setBcvRate(evRes.event.bcv_rate?.toString() || "");
+        const { ticket_price_bs, ticket_price_usdt, bcv_rate } = evRes.event;
+        setBsPrice(ticket_price_bs ? round2(ticket_price_bs).toString() : "");
+        setUsdtPrice(
+          ticket_price_usdt ? round2(ticket_price_usdt).toString() : "5",
+        );
+        setBcvRate(bcv_rate ? round2(bcv_rate).toString() : "");
       }
 
       if (!dateInitialized.current) {
@@ -329,22 +333,29 @@ export default function AdminPage() {
       showToast("No se pudo obtener la tasa del BCV", "err");
       return;
     }
-    const rate = data.rate;
+    const rate = round2(data.rate);
     const usdtVal = parseFloat(usdtPrice) || 5;
-    const bsVal = Math.round(rate * usdtVal);
+    const bsVal = round2(rate * usdtVal);
     setBcvRate(rate.toString());
     setBsPrice(bsVal.toString());
     setEvent((ev) =>
       ev ? { ...ev, bcv_rate: rate, ticket_price_bs: bsVal } : ev,
     );
     showToast(
-      `Tasa BCV: ${rate} Bs/USD · Entrada: ${bsVal.toLocaleString("es-VE")} Bs ✓`,
+      `Tasa BCV: ${rate} Bs/USD · Entrada: ${formatBs(bsVal)} Bs ✓`,
     );
   };
 
   const savePrecios = async () => {
     if (!event?.id) {
       showToast("Evento no cargado", "err");
+      return;
+    }
+    const bs = round2(parseFloat(bsPrice));
+    const usdt = round2(parseFloat(usdtPrice));
+    const bcv = round2(parseFloat(bcvRate) || 0);
+    if (!Number.isFinite(bs) || !Number.isFinite(usdt)) {
+      showToast("Revisa los precios ingresados", "err");
       return;
     }
     const [r1, r2, r3] = await Promise.all([
@@ -354,7 +365,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "set_ticket_price_bs",
           event_id: event.id,
-          ticket_price_bs: parseFloat(bsPrice),
+          ticket_price_bs: bs,
         }),
       }),
       fetch("/api/admin", {
@@ -363,7 +374,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "set_ticket_price_usdt",
           event_id: event.id,
-          ticket_price_usdt: parseFloat(usdtPrice),
+          ticket_price_usdt: usdt,
         }),
       }),
       fetch("/api/admin", {
@@ -372,7 +383,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "set_bcv_rate",
           event_id: event.id,
-          bcv_rate: parseFloat(bcvRate) || 0,
+          bcv_rate: bcv,
         }),
       }),
     ]);
@@ -380,19 +391,16 @@ export default function AdminPage() {
       // Update state directly from the values just saved — no re-fetch needed.
       // This avoids Supabase read-replica lag and race conditions with the
       // priceInitialized ref resetting prices before load() returns.
-      const savedBs = parseFloat(bsPrice);
-      const savedUsdt = parseFloat(usdtPrice);
-      const savedBcv = parseFloat(bcvRate) || 0;
-      setBsPrice(savedBs.toString());
-      setUsdtPrice(savedUsdt.toString());
-      setBcvRate(savedBcv.toString());
+      setBsPrice(bs.toString());
+      setUsdtPrice(usdt.toString());
+      setBcvRate(bcv.toString());
       setEvent((ev) =>
         ev
           ? {
               ...ev,
-              ticket_price_bs: savedBs,
-              ticket_price_usdt: savedUsdt,
-              bcv_rate: savedBcv,
+              ticket_price_bs: bs,
+              ticket_price_usdt: usdt,
+              bcv_rate: bcv,
             }
           : ev,
       );

@@ -3,8 +3,9 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAdmin, unauthorized } from "@/lib/security/admin-session";
 import { parseBody, uuid } from "@/lib/security/validate";
+import { round2 } from "@/lib/money";
 
-const price = z.number().finite().min(0).max(1_000_000_000);
+const price = z.number().finite().min(0).max(1_000_000_000).transform(round2);
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ping") }),

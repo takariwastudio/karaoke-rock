@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Settings, Calendar, Ticket, XCircle } from "lucide-react";
 import type { Event, SongQueue, Rating } from "@/lib/types";
+import { round2, formatBs } from "@/lib/money";
 
 interface ConfigTabProps {
   event: Event;
@@ -205,9 +206,9 @@ export function ConfigTab({
             <label className="label">Precio en Bolívares</label>
             <input
               type="number"
-              step="1"
+              step="0.01"
               className="input"
-              placeholder="Ej: 36500"
+              placeholder="Ej: 2640.35"
               value={bsPrice}
               onChange={(e) => setBsPrice(e.target.value)}
             />
@@ -216,9 +217,7 @@ export function ConfigTab({
                 <span>
                   {usdtPrice} USDT × {bcvRate} Bs ={" "}
                   <span className="text-r-amber">
-                    {(
-                      parseFloat(usdtPrice) * parseFloat(bcvRate)
-                    ).toLocaleString("es-VE")}{" "}
+                    {formatBs(parseFloat(usdtPrice) * parseFloat(bcvRate))}{" "}
                     Bs
                   </span>
                 </span>
@@ -226,7 +225,7 @@ export function ConfigTab({
                   className="text-r-purple underline text-xs"
                   onClick={() =>
                     setBsPrice(
-                      Math.round(
+                      round2(
                         parseFloat(usdtPrice) * parseFloat(bcvRate),
                       ).toString(),
                     )

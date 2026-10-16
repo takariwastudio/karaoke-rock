@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { CheckCircle } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
+import { formatBs } from "@/lib/money";
 
 const PAYMENT_INFO = {
   pago_movil: {
@@ -64,14 +65,14 @@ export default function TicketsPage() {
     method === "binance"
       ? `${event?.ticket_price_usdt ?? 5} USDT`
       : event?.ticket_price_bs
-        ? `Bs. ${Number(event.ticket_price_bs).toLocaleString("es-VE")}`
+        ? `Bs. ${formatBs(Number(event.ticket_price_bs))}`
         : "- Bs.";
 
   const totalPrice =
     method === "binance"
       ? `${(event?.ticket_price_usdt ?? 5) * quantity} USDT`
       : event?.ticket_price_bs
-        ? `Bs. ${(Number(event.ticket_price_bs) * quantity).toLocaleString("es-VE")}`
+        ? `Bs. ${formatBs(Number(event.ticket_price_bs) * quantity)}`
         : "- Bs.";
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => {

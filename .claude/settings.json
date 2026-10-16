@@ -8,7 +8,9 @@
       "Bash(npx next *)",
       "PowerShell(git rm --cached .env.local tsconfig.tsbuildinfo)",
       "PowerShell(node ./node_modules/typescript/bin/tsc --noEmit -p . 2>&1)",
-      "PowerShell(npx next build 2>&1)"
+      "PowerShell(npx next build 2>&1)",
+      "Bash(npx tsc *)",
+      "Bash(node -e ' *)"
     ]
   }
 }
