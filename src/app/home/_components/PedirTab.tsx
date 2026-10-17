@@ -10,7 +10,7 @@ interface PedirTabProps {
   eventId: string | null;
   cooldownRem: number;
   onSuccess: () => void;
-  waitingEntry: SongQueue | null;
+  waitingEntries: SongQueue[];
 }
 
 export function PedirTab({
@@ -18,9 +18,9 @@ export function PedirTab({
   eventId,
   cooldownRem,
   onSuccess,
-  waitingEntry,
+  waitingEntries,
 }: PedirTabProps) {
-  const [changing, setChanging] = useState(false);
+  const [changingId, setChangingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SpotifyTrack[]>([]);
   const [selected, setSelected] = useState<SpotifyTrack | null>(null);
@@ -30,7 +30,8 @@ export function PedirTab({
   const [submitting, setSubmitting] = useState(false);
   const debounce = useRef<NodeJS.Timeout>();
 
-  const isChanging = changing && !!waitingEntry;
+  const waitingEntry = waitingEntries.find((e) => e.id === changingId) ?? null;
+  const isChanging = !!waitingEntry;
 
   const search = (q: string) => {
     setQuery(q);
@@ -60,7 +61,7 @@ export function PedirTab({
     setSelected(null);
     setResults([]);
     setError("");
-    setChanging(false);
+    setChangingId(null);
   };
 
   const submit = async () => {
@@ -148,156 +149,159 @@ export function PedirTab({
 
   return (
     <div className="p-4 space-y-4">
-      {waitingEntry && !isChanging && (
+      {waitingEntries.length > 0 && !isChanging && (
         <div className="card border-r-amber/30 bg-r-amber/5">
           <p className="text-xs text-r-amber font-semibold mb-2">
-            Tu canción en la lista
+            {waitingEntries.length > 1
+              ? "Tus canciones en la lista"
+              : "Tu canción en la lista"}
           </p>
-          <div className="flex items-center gap-3">
-            {waitingEntry.album_art && (
+          <div className="space-y-3">
+            {waitingEntries.map((entry) => (
+              <div key={entry.id} className="flex items-center gap-3">
+                {entry.album_art && (
+                  <Image
+                    src={entry.album_art}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="rounded object-cover shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {entry.song_name}
+                  </p>
+                  <p className="text-xs text-r-muted">{entry.artist}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    reset();
+                    setChangingId(entry.id);
+                  }}
+                  className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-r-amber/30 text-r-amber hover:bg-r-amber/10 transition-colors"
+                >
+                  Cambiar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-xl tracking-wide">
+            {isChanging ? "CAMBIAR CANCIÓN" : "¡QUIERO CANTAR!"}
+          </h2>
+          {isChanging && (
+            <button
+              onClick={reset}
+              className="text-r-muted hover:text-r-text transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        {!isChanging && cooldownRem > 0 && (
+          <div className="flex items-center gap-2 bg-r-amber/10 border border-r-amber/20 rounded-lg px-3 py-2 text-sm text-r-amber mb-4">
+            <Clock size={14} />
+            <span>Cooldown activo — {cooldownRem} min restantes</span>
+          </div>
+        )}
+        <div className="relative">
+          <label className="label">Buscar en Spotify</label>
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-r-muted"
+            />
+            <input
+              type="text"
+              className="input pl-8 pr-8"
+              placeholder="Artista o canción..."
+              value={query}
+              onChange={(e) => search(e.target.value)}
+              disabled={!isChanging && cooldownRem > 0}
+            />
+            {query && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-r-muted hover:text-r-text"
+                onClick={() => {
+                  setQuery("");
+                  setSelected(null);
+                  setResults([]);
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {searching && (
+            <p className="text-xs text-r-muted mt-2">Buscando...</p>
+          )}
+          {results.length > 0 && !selected && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-r-surf2 border border-r-border rounded-xl overflow-hidden shadow-xl z-20 animate-fade-in">
+              {results.map((track) => (
+                <button
+                  key={track.id}
+                  onClick={() => pick(track)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-r-border transition-colors text-left border-b border-r-border last:border-0"
+                >
+                  {track.albumArt && (
+                    <Image
+                      src={track.albumArt}
+                      alt={track.album}
+                      width={36}
+                      height={36}
+                      className="rounded object-cover shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{track.name}</p>
+                    <p className="text-xs text-r-muted truncate">
+                      {track.artist} · {track.album}
+                    </p>
+                  </div>
+                  <ChevronRight
+                    size={12}
+                    className="text-r-muted shrink-0 ml-auto"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {selected && (
+          <div className="mt-3 bg-r-red/10 border border-r-red/20 rounded-lg px-3 py-2.5 flex items-center gap-3 animate-fade-in">
+            {selected.albumArt && (
               <Image
-                src={waitingEntry.album_art}
-                alt=""
+                src={selected.albumArt}
+                alt={selected.album}
                 width={40}
                 height={40}
                 className="rounded object-cover shrink-0"
               />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {waitingEntry.song_name}
-              </p>
-              <p className="text-xs text-r-muted">{waitingEntry.artist}</p>
+              <p className="text-sm font-medium">{selected.name}</p>
+              <p className="text-xs text-r-muted">{selected.artist}</p>
             </div>
-            <button
-              onClick={() => setChanging(true)}
-              className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-r-amber/30 text-r-amber hover:bg-r-amber/10 transition-colors"
-            >
-              Cambiar
-            </button>
           </div>
-        </div>
-      )}
-
-      {(!waitingEntry || isChanging) && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl tracking-wide">
-              {isChanging ? "CAMBIAR CANCIÓN" : "¡QUIERO CANTAR!"}
-            </h2>
-            {isChanging && (
-              <button
-                onClick={reset}
-                className="text-r-muted hover:text-r-text transition-colors"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-          {!isChanging && cooldownRem > 0 && (
-            <div className="flex items-center gap-2 bg-r-amber/10 border border-r-amber/20 rounded-lg px-3 py-2 text-sm text-r-amber mb-4">
-              <Clock size={14} />
-              <span>Cooldown activo — {cooldownRem} min restantes</span>
-            </div>
-          )}
-          <div className="relative">
-            <label className="label">Buscar en Spotify</label>
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-r-muted"
-              />
-              <input
-                type="text"
-                className="input pl-8 pr-8"
-                placeholder="Artista o canción..."
-                value={query}
-                onChange={(e) => search(e.target.value)}
-                disabled={!isChanging && cooldownRem > 0}
-              />
-              {query && (
-                <button
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-r-muted hover:text-r-text"
-                  onClick={() => {
-                    setQuery("");
-                    setSelected(null);
-                    setResults([]);
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            {searching && (
-              <p className="text-xs text-r-muted mt-2">Buscando...</p>
-            )}
-            {results.length > 0 && !selected && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-r-surf2 border border-r-border rounded-xl overflow-hidden shadow-xl z-20 animate-fade-in">
-                {results.map((track) => (
-                  <button
-                    key={track.id}
-                    onClick={() => pick(track)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-r-border transition-colors text-left border-b border-r-border last:border-0"
-                  >
-                    {track.albumArt && (
-                      <Image
-                        src={track.albumArt}
-                        alt={track.album}
-                        width={36}
-                        height={36}
-                        className="rounded object-cover shrink-0"
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {track.name}
-                      </p>
-                      <p className="text-xs text-r-muted truncate">
-                        {track.artist} · {track.album}
-                      </p>
-                    </div>
-                    <ChevronRight
-                      size={12}
-                      className="text-r-muted shrink-0 ml-auto"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {selected && (
-            <div className="mt-3 bg-r-red/10 border border-r-red/20 rounded-lg px-3 py-2.5 flex items-center gap-3 animate-fade-in">
-              {selected.albumArt && (
-                <Image
-                  src={selected.albumArt}
-                  alt={selected.album}
-                  width={40}
-                  height={40}
-                  className="rounded object-cover shrink-0"
-                />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{selected.name}</p>
-                <p className="text-xs text-r-muted">{selected.artist}</p>
-              </div>
-            </div>
-          )}
-          {error && <p className="text-r-red text-xs mt-2">{error}</p>}
-          <button
-            className="btn-primary mt-4"
-            onClick={submit}
-            disabled={
-              !selected || (!isChanging && cooldownRem > 0) || submitting
-            }
-          >
-            {submitting
-              ? "ENVIANDO..."
-              : isChanging
-                ? "CONFIRMAR CAMBIO"
-                : "AGREGAR A LA LISTA"}
-          </button>
-        </div>
-      )}
+        )}
+        {error && <p className="text-r-red text-xs mt-2">{error}</p>}
+        <button
+          className="btn-primary mt-4"
+          onClick={submit}
+          disabled={!selected || (!isChanging && cooldownRem > 0) || submitting}
+        >
+          {submitting
+            ? "ENVIANDO..."
+            : isChanging
+              ? "CONFIRMAR CAMBIO"
+              : "AGREGAR A LA LISTA"}
+        </button>
+      </div>
     </div>
   );
 }

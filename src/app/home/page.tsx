@@ -28,6 +28,13 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [showCountdown, setShowCountdown] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Re-render periódico para que el cooldown expire sin recargar
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
 
   const loadData = useCallback(
     async (eid: string) => {
@@ -227,7 +234,7 @@ export default function HomePage() {
         0,
         Math.ceil(
           (cooldown * 60_000 -
-            (Date.now() - new Date(lastRequest.requested_at).getTime())) /
+            (now - new Date(lastRequest.requested_at).getTime())) /
             60_000,
         ),
       )
@@ -281,7 +288,7 @@ export default function HomePage() {
             eventId={eventId}
             cooldownRem={cooldownRem}
             onSuccess={() => setTab("lista")}
-            waitingEntry={waiting.find((e) => e.user_id === user.id) ?? null}
+            waitingEntries={waiting.filter((e) => e.user_id === user.id)}
           />
         )}
         {tab === "calificar" && (

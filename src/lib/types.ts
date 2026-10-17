@@ -19,6 +19,9 @@ export interface Event {
   created_at: string;
 }
 
+// Máximo de entradas por compra web (un solo QR para todo el grupo)
+export const MAX_TICKETS_PER_ORDER = 30;
+
 export type SongStatus = "waiting" | "singing" | "done" | "noshow";
 
 export interface SongQueue {

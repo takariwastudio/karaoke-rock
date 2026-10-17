@@ -254,12 +254,14 @@ export default function StagePage() {
                   />
                 )}
                 <p
+                  className="animate-now-playing line-clamp-2"
                   style={{
                     fontFamily: "var(--font-bebas)",
-                    lineHeight: 1,
-                    fontSize: "clamp(3.5rem, 8vw, 7rem)",
+                    lineHeight: 1.05,
+                    fontSize: "clamp(2.25rem, 4.5vw, 4rem)",
                     letterSpacing: 2,
                     color: "#f5f5f5",
+                    transformOrigin: "left center",
                   }}
                 >
                   {singing.song_name}

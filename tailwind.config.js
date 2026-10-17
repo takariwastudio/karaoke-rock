@@ -28,12 +28,23 @@ module.exports = {
         "fade-in": "fadeIn 0.2s ease-out",
         "slide-up": "slideUp 0.25s ease-out",
         "pulse-slow": "pulse 2.5s cubic-bezier(0.4,0,0.6,1) infinite",
+        "now-playing": "nowPlaying 2s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: { from: { opacity: "0" }, to: { opacity: "1" } },
         slideUp: {
           from: { transform: "translateY(10px)", opacity: "0" },
           to: { transform: "translateY(0)", opacity: "1" },
+        },
+        nowPlaying: {
+          "0%, 100%": {
+            transform: "scale(1)",
+            textShadow: "0 0 0 rgba(230,60,35,0)",
+          },
+          "50%": {
+            transform: "scale(1.03)",
+            textShadow: "0 0 24px rgba(230,60,35,0.75)",
+          },
         },
       },
     },

@@ -4,6 +4,7 @@ import { CheckCircle } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import { formatBs } from "@/lib/money";
+import { MAX_TICKETS_PER_ORDER } from "@/lib/types";
 
 const PAYMENT_INFO = {
   pago_movil: {
@@ -122,7 +123,9 @@ export default function TicketsPage() {
         setErrors({ [data.field]: fieldMsg[data.field] });
         setStep("form");
       } else if (data.field === "payment_ref") {
-        setErrors({ payment_ref: "Referencia inválida (solo letras y números)" });
+        setErrors({
+          payment_ref: "Referencia inválida (solo letras y números)",
+        });
       } else {
         setErrors({ payment_ref: data.error || "Error al enviar" });
       }
@@ -279,7 +282,9 @@ export default function TicketsPage() {
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                    onClick={() =>
+                      setQuantity((q) => Math.min(MAX_TICKETS_PER_ORDER, q + 1))
+                    }
                     className="w-10 h-10 rounded-lg border border-r-border text-r-text text-xl hover:bg-r-surf2 transition-colors flex items-center justify-center"
                   >
                     +

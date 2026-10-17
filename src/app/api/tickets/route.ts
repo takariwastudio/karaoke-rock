@@ -5,6 +5,7 @@ import { isAdmin, unauthorized } from "@/lib/security/admin-session";
 import { decryptTicket, encrypt } from "@/lib/security/crypto";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { cleanText, parseBody, uuid } from "@/lib/security/validate";
+import { MAX_TICKETS_PER_ORDER } from "@/lib/types";
 
 const STATUSES = ["pending", "approved", "used", "rejected"] as const;
 
@@ -53,6 +54,7 @@ const ticketSchema = z.object({
     .trim()
     .regex(/^[A-Za-z0-9-]{4,64}$/, "Referencia inválida"),
   event_id: uuid,
+  quantity: z.number().int().min(1).max(MAX_TICKETS_PER_ORDER).default(1),
   // Anti-bots: campo trampa (debe venir vacío) y tiempo mínimo de llenado
   website: z.string().max(0).optional(),
   form_started_at: z.number().int().optional(),
@@ -67,11 +69,7 @@ export async function POST(req: NextRequest) {
   const t = body.data;
 
   // Bot: llenó el honeypot o envió el formulario en menos de 3 s
-  if (
-    t.website ||
-    !t.form_started_at ||
-    Date.now() - t.form_started_at < 3000
-  )
+  if (t.website || !t.form_started_at || Date.now() - t.form_started_at < 3000)
     return NextResponse.json({ ok: true }, { status: 201 });
 
   const db = createServiceClient();
@@ -87,10 +85,12 @@ export async function POST(req: NextRequest) {
     );
 
   const payment_currency = t.payment_method === "binance" ? "USDT" : "Bs";
-  const payment_amount =
+  const unit_price =
     t.payment_method === "binance"
       ? event.ticket_price_usdt
       : event.ticket_price_bs;
+  const payment_amount =
+    unit_price == null ? unit_price : Number(unit_price) * t.quantity;
 
   const { error } = await db.from("tickets").insert({
     event_id: t.event_id,
@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
     payment_ref: t.payment_ref,
     payment_amount,
     payment_currency,
+    quantity: t.quantity,
   });
 
   if (error) {
