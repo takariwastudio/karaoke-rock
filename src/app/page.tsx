@@ -145,6 +145,28 @@ export default function LoginPage() {
     };
   }, []);
 
+  // Si Supabase devuelve el login a "/" (ej: ?code=… cuando /auth/callback no
+  // está en las Redirect URLs), el cliente crea la sesión aquí sin que la
+  // página se entere. Al detectarla, ir al home sin necesidad de refrescar.
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" || !session) return;
+      // Fuera del callback: llamar auth.* dentro de él bloquea el lock de sesión
+      setTimeout(async () => {
+        // Validar con el servidor de auth para no entrar en bucle con una
+        // cookie vieja/inválida (el middleware la rechazaría y volvería aquí)
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) window.location.replace("/home");
+      }, 0);
+    });
+    return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleGoogle = async () => {
     setLoading(true);
     await supabase.auth.signInWithOAuth({
