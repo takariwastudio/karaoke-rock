@@ -13,17 +13,17 @@
     "postcss": "^8.5.30"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.43.4",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
     "clsx": "^2.1.1",
     "html5-qrcode": "^2.3.8",
-    "lucide-react": "^0.400.0",
+    "lucide-react": "^0.577.0",
     "next": "^14.2.35",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18",
     "react-dom": "^18",
-    "resend": "^6.31.0",
+    "resend": "^6.34.1",
     "server-only": "^0.0.1",
     "zod": "^3.25.76"
   },
