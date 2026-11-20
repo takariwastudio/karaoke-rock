@@ -2,10 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAdmin, unauthorized } from "@/lib/security/admin-session";
-import { parseBody, uuid } from "@/lib/security/validate";
+import { httpUrl, parseBody, uuid } from "@/lib/security/validate";
 import { round2 } from "@/lib/money";
 
 const price = z.number().finite().min(0).max(1_000_000_000).transform(round2);
+const optionalLocationName = z
+  .string()
+  .transform((s) => s.replace(/[\u0000-\u001F\u007F]/g, "").trim())
+  .pipe(z.string().max(120))
+  .nullable()
+  .optional();
+const optionalLocationUrl = z
+  .string()
+  .transform((s) => s.trim())
+  .pipe(z.union([z.literal(""), httpUrl]))
+  .nullable()
+  .optional();
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ping") }),
@@ -18,6 +30,8 @@ const schema = z.discriminatedUnion("action", [
     action: z.literal("set_event_time"),
     event_id: uuid,
     starts_at: z.string().datetime().nullable().optional(),
+    location_name: optionalLocationName,
+    location_url: optionalLocationUrl,
   }),
   z.object({
     action: z.literal("set_cooldown"),
@@ -126,9 +140,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     case "set_event_time": {
+      const patch: Record<string, string | null> = {
+        starts_at: p.starts_at ?? null,
+      };
+      if (p.location_name !== undefined)
+        patch.location_name = p.location_name || null;
+      if (p.location_url !== undefined)
+        patch.location_url = p.location_url || null;
       const { error } = await db
         .from("events")
-        .update({ starts_at: p.starts_at ?? null })
+        .update(patch)
         .eq("id", p.event_id);
       if (error) return fail();
       return NextResponse.json({ ok: true });

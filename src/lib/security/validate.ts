@@ -23,6 +23,19 @@ const httpsFrom = (hosts: RegExp) =>
 
 export const albumArtUrl = httpsFrom(/^i\.scdn\.co$/);
 export const avatarUrl = httpsFrom(/(^|\.)googleusercontent\.com$/);
+export const httpUrl = z
+  .string()
+  .trim()
+  .url("URL inválida")
+  .max(500)
+  .refine((u) => {
+    try {
+      const url = new URL(u);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }, "Protocolo no permitido");
 export const spotifyId = z.string().regex(/^[A-Za-z0-9]{1,40}$/);
 
 export const songSchema = z.object({

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, MapPin, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import { formatBs } from "@/lib/money";
@@ -205,6 +205,30 @@ export default function TicketsPage() {
                   </span>
                 )}
               </p>
+            )}
+            {(event.location_name ||
+              (event.location_url &&
+                /^https?:\/\//i.test(event.location_url))) && (
+              <div className="flex items-center gap-2 flex-wrap mt-2 text-xs text-r-muted">
+                <MapPin size={13} className="text-r-red shrink-0" />
+                {event.location_name && (
+                  <span className="text-r-text font-medium">
+                    {event.location_name}
+                  </span>
+                )}
+                {event.location_url &&
+                  /^https?:\/\//i.test(event.location_url) && (
+                    <a
+                      href={event.location_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-r-amber hover:underline"
+                    >
+                      <span>Ver mapa</span>
+                      <ExternalLink size={11} />
+                    </a>
+                  )}
+              </div>
             )}
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               <span className="text-r-amber font-display text-xl">

@@ -1,5 +1,12 @@
 import clsx from "clsx";
-import { Settings, Calendar, Ticket, XCircle } from "lucide-react";
+import {
+  Settings,
+  Calendar,
+  Ticket,
+  XCircle,
+  MapPin,
+  ExternalLink,
+} from "lucide-react";
 import type { Event, SongQueue, Rating } from "@/lib/types";
 import { round2, formatBs } from "@/lib/money";
 
@@ -8,6 +15,10 @@ interface ConfigTabProps {
   setEvent: (e: Event) => void;
   eventDateTime: string;
   setEventDateTime: (d: string) => void;
+  locationName: string;
+  setLocationName: (v: string) => void;
+  locationUrl: string;
+  setLocationUrl: (v: string) => void;
   bsPrice: string;
   setBsPrice: (p: string) => void;
   usdtPrice: string;
@@ -30,6 +41,10 @@ export function ConfigTab({
   setEvent,
   eventDateTime,
   setEventDateTime,
+  locationName,
+  setLocationName,
+  locationUrl,
+  setLocationUrl,
   bsPrice,
   setBsPrice,
   usdtPrice,
@@ -112,12 +127,13 @@ export function ConfigTab({
           <Calendar size={15} className="text-r-amber" /> Próximo evento
         </h3>
         <p className="text-xs text-r-muted mb-6">
-          Activa un countdown en el home hasta que llegue la hora.
+          Activa un countdown en el home hasta que llegue la hora. El lugar y el
+          link del mapa son opcionales.
         </p>
         {event.starts_at && (
           <div className="mb-4 bg-r-amber/10 border border-r-amber/20 rounded-lg px-3 py-2.5">
             <p className="text-xs text-r-muted">Countdown activo para</p>
-            <p className="text-sm font-medium text-r-amber mt-0.5">
+            <p className="text-sm font-medium text-r-amber mt-0.5 capitalize">
               {new Date(event.starts_at).toLocaleDateString("es-VE", {
                 weekday: "long",
                 day: "numeric",
@@ -129,20 +145,66 @@ export function ConfigTab({
                 minute: "2-digit",
               })}
             </p>
+            {(event.location_name ||
+              (event.location_url &&
+                /^https?:\/\//i.test(event.location_url))) && (
+              <div className="flex items-center gap-1.5 flex-wrap text-xs text-r-muted mt-1.5">
+                <MapPin size={12} className="text-r-amber shrink-0" />
+                {event.location_name && (
+                  <span className="text-r-text">{event.location_name}</span>
+                )}
+                {event.location_url &&
+                  /^https?:\/\//i.test(event.location_url) && (
+                    <a
+                      href={event.location_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-r-amber hover:underline"
+                    >
+                      <span>Ver mapa</span>
+                      <ExternalLink size={11} />
+                    </a>
+                  )}
+              </div>
+            )}
           </div>
         )}
-        <div className="flex-1">
-          <label className="label">Fecha y hora de inicio</label>
-          <input
-            type="datetime-local"
-            className="input text-sm"
-            value={eventDateTime}
-            onChange={(e) => setEventDateTime(e.target.value)}
-          />
+        <div className="flex-1 space-y-3">
+          <div>
+            <label className="label">Fecha y hora de inicio</label>
+            <input
+              type="datetime-local"
+              className="input text-sm"
+              value={eventDateTime}
+              onChange={(e) => setEventDateTime(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Lugar (opcional)</label>
+            <input
+              type="text"
+              className="input text-sm"
+              placeholder="Ej: Bar Rock, Las Delicias"
+              maxLength={120}
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Link del mapa (opcional)</label>
+            <input
+              type="url"
+              className="input text-sm"
+              placeholder="https://maps.app.goo.gl/..."
+              maxLength={500}
+              value={locationUrl}
+              onChange={(e) => setLocationUrl(e.target.value)}
+            />
+          </div>
         </div>
         <div className="flex gap-2 mt-5">
           <button className="btn-ghost flex-1" onClick={() => saveEventTime()}>
-            Guardar fecha
+            Guardar
           </button>
           <button
             onClick={() => {

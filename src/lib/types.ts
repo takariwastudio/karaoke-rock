@@ -13,6 +13,8 @@ export interface Event {
   is_active: boolean;
   cooldown_minutes: number;
   starts_at: string | null;
+  location_name: string | null;
+  location_url: string | null;
   ticket_price_bs: number | null;
   ticket_price_usdt: number;
   bcv_rate: number;

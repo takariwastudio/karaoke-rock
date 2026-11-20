@@ -88,6 +88,8 @@ export default function AdminPage() {
     "dashboard" | "usuarios" | "entradas" | "config"
   >("dashboard");
   const [eventDateTime, setEventDateTime] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [locationUrl, setLocationUrl] = useState("");
   const [toast, setToast] = useState<{
     msg: string;
     type: "ok" | "err";
@@ -191,6 +193,8 @@ export default function AdminPage() {
         } else {
           setEventDateTime("");
         }
+        setLocationName(evRes.event.location_name ?? "");
+        setLocationUrl(evRes.event.location_url ?? "");
       }
     }
     if (qRes.data)
@@ -300,28 +304,68 @@ export default function AdminPage() {
       showToast("Evento no cargado", "err");
       return;
     }
+    const cleanLocName = locationName.trim() || null;
+    const cleanLocUrl = locationUrl.trim() || null;
+    if (!clear && cleanLocUrl) {
+      try {
+        const parsed = new URL(cleanLocUrl);
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+          showToast("El link del mapa debe comenzar con https://", "err");
+          return;
+        }
+      } catch {
+        showToast("Link de mapa inválido (usa https://...)", "err");
+        return;
+      }
+    }
     const starts_at = clear
       ? null
       : eventDateTime
         ? new Date(eventDateTime).toISOString()
         : null;
+    const payload: Record<string, unknown> = {
+      action: "set_event_time",
+      event_id: event.id,
+      starts_at,
+    };
+    if (!clear) {
+      payload.location_name = cleanLocName;
+      payload.location_url = cleanLocUrl;
+    }
     const res = await fetch("/api/admin", {
       method: "POST",
       headers: JSON_HEADERS,
-      body: JSON.stringify({
-        action: "set_event_time",
-        event_id: event.id,
-        starts_at,
-      }),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
-      setEvent((ev) => (ev ? { ...ev, starts_at } : ev));
+      setEvent((ev) =>
+        ev
+          ? {
+              ...ev,
+              starts_at,
+              ...(clear
+                ? {}
+                : { location_name: cleanLocName, location_url: cleanLocUrl }),
+            }
+          : ev,
+      );
       if (clear) {
         dateInitialized.current = false;
         setEventDateTime("");
+      } else {
+        setLocationName(cleanLocName ?? "");
+        setLocationUrl(cleanLocUrl ?? "");
       }
-      showToast(clear ? "Countdown eliminado" : "Fecha del evento guardada ✓");
-    } else showToast("Error al guardar la fecha", "err");
+      showToast(clear ? "Countdown eliminado" : "Próximo evento guardado ✓");
+    } else {
+      const data = await res.json().catch(() => null);
+      showToast(
+        data?.field === "location_url"
+          ? "Link de mapa inválido (usa https://...)"
+          : "Error al guardar el evento",
+        "err",
+      );
+    }
   };
 
   const fetchBcv = async () => {
@@ -627,6 +671,10 @@ export default function AdminPage() {
             setEvent={setEvent}
             eventDateTime={eventDateTime}
             setEventDateTime={setEventDateTime}
+            locationName={locationName}
+            setLocationName={setLocationName}
+            locationUrl={locationUrl}
+            setLocationUrl={setLocationUrl}
             bsPrice={bsPrice}
             setBsPrice={setBsPrice}
             usdtPrice={usdtPrice}

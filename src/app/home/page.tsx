@@ -27,6 +27,8 @@ export default function HomePage() {
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
   const [startsAt, setStartsAt] = useState<string | null>(null);
+  const [locationName, setLocationName] = useState<string | null>(null);
+  const [locationUrl, setLocationUrl] = useState<string | null>(null);
   const [showCountdown, setShowCountdown] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -56,7 +58,7 @@ export default function HomePage() {
   const reloadEvent = useCallback(async () => {
     const { data: event } = await supabase
       .from("events")
-      .select("id, cooldown_minutes, starts_at")
+      .select("id, cooldown_minutes, starts_at, location_name, location_url")
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -65,6 +67,8 @@ export default function HomePage() {
     setEventId(event.id);
     setCooldown(event.cooldown_minutes);
     setStartsAt(event.starts_at ?? null);
+    setLocationName(event.location_name ?? null);
+    setLocationUrl(event.location_url ?? null);
     setShowCountdown(
       !!event.starts_at && new Date(event.starts_at).getTime() > Date.now(),
     );
@@ -106,7 +110,7 @@ export default function HomePage() {
 
       const { data: event } = await supabase
         .from("events")
-        .select("id, cooldown_minutes, starts_at")
+        .select("id, cooldown_minutes, starts_at, location_name, location_url")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -115,6 +119,8 @@ export default function HomePage() {
         setEventId(event.id);
         setCooldown(event.cooldown_minutes);
         setStartsAt(event.starts_at ?? null);
+        setLocationName(event.location_name ?? null);
+        setLocationUrl(event.location_url ?? null);
         setShowCountdown(
           !!event.starts_at && new Date(event.starts_at).getTime() > Date.now(),
         );
@@ -160,6 +166,8 @@ export default function HomePage() {
           }
           const sa = payload.new?.starts_at ?? null;
           setStartsAt(sa);
+          setLocationName(payload.new?.location_name ?? null);
+          setLocationUrl(payload.new?.location_url ?? null);
           setShowCountdown(!!sa && new Date(sa).getTime() > Date.now());
           setCooldown(payload.new?.cooldown_minutes ?? 30);
         },
@@ -187,6 +195,8 @@ export default function HomePage() {
       <CountdownView
         startsAt={startsAt}
         userName={user.name}
+        locationName={locationName}
+        locationUrl={locationUrl}
         onExpire={() => setShowCountdown(false)}
       />
     );

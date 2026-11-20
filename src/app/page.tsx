@@ -2,107 +2,27 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
-
-// ── Countdown helpers ──────────────────────────────────────
-function getRemaining(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
-  if (diff <= 0) return null;
-  return {
-    days: Math.floor(diff / 86400000),
-    hours: Math.floor((diff % 86400000) / 3600000),
-    minutes: Math.floor((diff % 3600000) / 60000),
-    seconds: Math.floor((diff % 60000) / 1000),
-  };
-}
-
-function CountdownScreen({
-  startsAt,
-  onExpire,
-}: {
-  startsAt: string;
-  onExpire: () => void;
-}) {
-  const [rem, setRem] = useState(() => getRemaining(startsAt));
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      const r = getRemaining(startsAt);
-      setRem(r);
-      if (!r) onExpire();
-    }, 1000);
-    return () => clearInterval(t);
-  }, [startsAt, onExpire]);
-
-  if (!rem) return null;
-
-  const date = new Date(startsAt).toLocaleDateString("es-VE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const time = new Date(startsAt).toLocaleTimeString("es-VE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  return (
-    <div className="min-h-screen bg-r-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-r-red/5 blur-3xl" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-r-amber/5 blur-3xl" />
-      </div>
-
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center gap-6">
-        <div>
-          <h1 className="font-display text-5xl tracking-[4px]">
-            KARAOKE <span className="text-r-red">ROCK</span>
-          </h1>
-          <p className="text-r-muted text-sm mt-2">Maracay</p>
-        </div>
-
-        <p className="text-r-muted text-sm">El evento comienza en...</p>
-
-        <div className="grid grid-cols-4 gap-3 w-full">
-          {[
-            { v: rem.days, l: "Días" },
-            { v: rem.hours, l: "Horas" },
-            { v: rem.minutes, l: "Min" },
-            { v: rem.seconds, l: "Seg" },
-          ].map(({ v, l }) => (
-            <div key={l} className="card2 text-center py-4">
-              <p className="font-display text-4xl text-r-amber leading-none">
-                {String(v).padStart(2, "0")}
-              </p>
-              <p className="text-[10px] text-r-muted uppercase tracking-wider mt-1">
-                {l}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="card w-full">
-          <p className="text-sm font-medium capitalize">{date}</p>
-          <p className="text-r-muted text-sm">{time}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { CountdownView } from "@/components/CountdownView";
 
 // ── Login page ─────────────────────────────────────────────
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [startsAt, setStartsAt] = useState<string | null>(null);
+  const [locationName, setLocationName] = useState<string | null>(null);
+  const [locationUrl, setLocationUrl] = useState<string | null>(null);
   const [showCountdown, setShowCountdown] = useState(false);
   const [checking, setChecking] = useState(true);
   const supabase = createClient();
 
   useEffect(() => {
     const check = async () => {
-      const res = await fetch("/api/admin/event").catch(() => null);
+      const res = await fetch("/api/admin/event", { cache: "no-store" }).catch(
+        () => null,
+      );
       const data = res?.ok ? await res.json() : null;
       const sa = data?.event?.starts_at ?? null;
+      setLocationName(data?.event?.location_name ?? null);
+      setLocationUrl(data?.event?.location_url ?? null);
       if (sa && new Date(sa).getTime() > Date.now()) {
         setStartsAt(sa);
         setShowCountdown(true);
@@ -130,6 +50,8 @@ export default function LoginPage() {
         },
         (payload: any) => {
           const sa = payload.new?.starts_at ?? null;
+          setLocationName(payload.new?.location_name ?? null);
+          setLocationUrl(payload.new?.location_url ?? null);
           if (sa && new Date(sa).getTime() > Date.now()) {
             setStartsAt(sa);
             setShowCountdown(true);
@@ -186,8 +108,10 @@ export default function LoginPage() {
   // Countdown activo — no se puede hacer nada
   if (showCountdown && startsAt) {
     return (
-      <CountdownScreen
+      <CountdownView
         startsAt={startsAt}
+        locationName={locationName}
+        locationUrl={locationUrl}
         onExpire={() => setShowCountdown(false)}
       />
     );

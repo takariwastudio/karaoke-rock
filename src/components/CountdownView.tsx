@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { MapPin, ExternalLink } from "lucide-react";
 
 function getRemaining(iso: string) {
   const diff = new Date(iso).getTime() - Date.now();
@@ -16,12 +17,16 @@ function getRemaining(iso: string) {
 interface CountdownViewProps {
   startsAt: string;
   userName?: string;
+  locationName?: string | null;
+  locationUrl?: string | null;
   onExpire: () => void;
 }
 
 export function CountdownView({
   startsAt,
   userName,
+  locationName,
+  locationUrl,
   onExpire,
 }: CountdownViewProps) {
   const [rem, setRem] = useState(() => getRemaining(startsAt));
@@ -34,6 +39,7 @@ export function CountdownView({
     return () => clearInterval(t);
   }, [startsAt, onExpire]);
   if (!rem) return null;
+
   const date = new Date(startsAt).toLocaleDateString("es-VE", {
     weekday: "long",
     day: "numeric",
@@ -44,6 +50,12 @@ export function CountdownView({
     hour: "2-digit",
     minute: "2-digit",
   });
+  const cleanLocationName = locationName?.trim() || null;
+  const safeLocationUrl =
+    locationUrl && /^https?:\/\//i.test(locationUrl.trim())
+      ? locationUrl.trim()
+      : null;
+
   return (
     <div className="min-h-screen bg-r-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -90,6 +102,32 @@ export function CountdownView({
         <div className="card w-full">
           <p className="text-sm font-medium capitalize">{date}</p>
           <p className="text-r-muted text-sm">{time}</p>
+          {(cleanLocationName || safeLocationUrl) && (
+            <div className="border-t border-r-border mt-3 pt-3 flex flex-col items-center gap-2">
+              {cleanLocationName && (
+                <div className="flex items-center justify-center gap-1.5 text-sm font-medium text-r-text">
+                  <MapPin size={15} className="text-r-red shrink-0" />
+                  <span>{cleanLocationName}</span>
+                </div>
+              )}
+              {safeLocationUrl && (
+                <a
+                  href={safeLocationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-r-amber hover:text-r-text border border-r-amber/30 bg-r-amber/10 hover:bg-r-amber/20 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  {!cleanLocationName && <MapPin size={13} />}
+                  <span>
+                    {cleanLocationName
+                      ? "Ver en el mapa"
+                      : "Ver ubicación en el mapa"}
+                  </span>
+                  <ExternalLink size={12} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
