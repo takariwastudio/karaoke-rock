@@ -55,14 +55,31 @@ export default function HomePage() {
     [supabase],
   );
 
-  const reloadEvent = useCallback(async () => {
-    const { data: event } = await supabase
+  const fetchActiveEvent = useCallback(async () => {
+    const res = await supabase
       .from("events")
       .select("id, cooldown_minutes, starts_at, location_name, location_url")
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
+    if (res.error?.code === "42703" || res.error?.code === "PGRST204") {
+      const fallback = await supabase
+        .from("events")
+        .select("id, cooldown_minutes, starts_at")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      return fallback.data
+        ? { ...fallback.data, location_name: null, location_url: null }
+        : null;
+    }
+    return res.data;
+  }, [supabase]);
+
+  const reloadEvent = useCallback(async () => {
+    const event = await fetchActiveEvent();
     if (!event) return;
     setEventId(event.id);
     setCooldown(event.cooldown_minutes);
@@ -75,7 +92,7 @@ export default function HomePage() {
     setQueue([]);
     setRatings([]);
     await loadData(event.id);
-  }, [supabase, loadData]);
+  }, [fetchActiveEvent, loadData]);
 
   useEffect(() => {
     const init = async () => {
@@ -108,13 +125,7 @@ export default function HomePage() {
       }
       setUser(profile);
 
-      const { data: event } = await supabase
-        .from("events")
-        .select("id, cooldown_minutes, starts_at, location_name, location_url")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      const event = await fetchActiveEvent();
       if (event) {
         setEventId(event.id);
         setCooldown(event.cooldown_minutes);

@@ -362,7 +362,7 @@ export default function AdminPage() {
       showToast(
         data?.field === "location_url"
           ? "Link de mapa inválido (usa https://...)"
-          : "Error al guardar el evento",
+          : data?.error || "Error al guardar el evento",
         "err",
       );
     }

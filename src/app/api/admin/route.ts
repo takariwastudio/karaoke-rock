@@ -151,6 +151,23 @@ export async function POST(req: NextRequest) {
         .from("events")
         .update(patch)
         .eq("id", p.event_id);
+      if (error?.code === "42703" || error?.code === "PGRST204") {
+        if (patch.location_name || patch.location_url) {
+          return NextResponse.json(
+            {
+              error:
+                "Ejecuta la migración SQL de ubicación en Supabase para guardar el lugar",
+            },
+            { status: 400 },
+          );
+        }
+        const retry = await db
+          .from("events")
+          .update({ starts_at: p.starts_at ?? null })
+          .eq("id", p.event_id);
+        if (retry.error) return fail();
+        return NextResponse.json({ ok: true });
+      }
       if (error) return fail();
       return NextResponse.json({ ok: true });
     }
