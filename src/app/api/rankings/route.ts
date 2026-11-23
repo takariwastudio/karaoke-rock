@@ -16,10 +16,23 @@ export async function GET() {
     .from("ratings")
     .select("song_queue_id, stars");
 
-  const { data: winners } = await db
+  let { data: winners, error: winnersErr } = await db
     .from("event_winners")
-    .select("user_id, user_name, avg_rating, vote_count, event_date, song_name")
-    .order("created_at", { ascending: false });
+    .select(
+      "event_id, position, user_id, user_name, avg_rating, vote_count, event_date, song_name, artist, created_at",
+    )
+    .order("event_date", { ascending: false })
+    .order("position", { ascending: true });
+
+  if (winnersErr?.code === "42703" || winnersErr?.code === "PGRST204") {
+    const fallback = await db
+      .from("event_winners")
+      .select(
+        "event_id, user_id, user_name, avg_rating, vote_count, event_date, song_name, artist, created_at",
+      )
+      .order("created_at", { ascending: false });
+    winners = (fallback.data ?? []).map((w: any) => ({ ...w, position: 1 }));
+  }
 
   // Agrupar por usuario
   const userMap: Record<
@@ -52,9 +65,10 @@ export async function GET() {
     userMap[uid].totalVotes += rs.length;
   });
 
-  winners?.forEach((w) => {
+  winners?.forEach((w: any) => {
     if (!w.user_id) return;
-    if (userMap[w.user_id]) userMap[w.user_id].timesWon++;
+    if ((w.position ?? 1) === 1 && userMap[w.user_id])
+      userMap[w.user_id].timesWon++;
   });
 
   const historical = Object.values(userMap)

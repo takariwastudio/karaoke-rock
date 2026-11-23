@@ -9,15 +9,23 @@ import {
   Copy,
   ExternalLink,
   Ticket,
+  Trophy,
 } from "lucide-react";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
+import { Avatar } from "@/components/Avatar";
 import { DJControls } from "./_components/DJControls";
 import { DashboardTab } from "./_components/DashboardTab";
 import { UsuariosTab } from "./_components/UsuariosTab";
 import { EntradasTab } from "./_components/EntradasTab";
 import { ConfigTab } from "./_components/ConfigTab";
-import type { Profile, SongQueue, Rating, Event } from "@/lib/types";
+import type {
+  Profile,
+  SongQueue,
+  Rating,
+  Event,
+  NightPodiumEntry,
+} from "@/lib/types";
 import { round2, formatBs } from "@/lib/money";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -110,6 +118,12 @@ export default function AdminPage() {
   const [closing, setClosing] = useState(false);
   const [historical, setHistorical] = useState<any[]>([]);
   const [histWinners, setHistWinners] = useState<any[]>([]);
+  const [closedNightModal, setClosedNightModal] = useState<{
+    eventName: string;
+    eventDate: string;
+    top3: NightPodiumEntry[];
+    podiumSaved: boolean;
+  } | null>(null);
 
   const dateInitialized = useRef(false);
   const priceInitialized = useRef(false);
@@ -487,7 +501,7 @@ export default function AdminPage() {
     if (!event?.id) return;
     if (
       !confirm(
-        "¿Cerrar la noche actual? Esto guardará al ganador y creará un nuevo evento en blanco.",
+        "¿Cerrar la noche actual? Esto guardará el Top 3 cantantes y creará un nuevo evento en blanco.",
       )
     )
       return;
@@ -500,6 +514,12 @@ export default function AdminPage() {
     const data = await res.json();
     setClosing(false);
     if (res.ok) {
+      setClosedNightModal({
+        eventName: data.closed_event?.name || event.name,
+        eventDate: data.closed_event?.date || event.date,
+        top3: Array.isArray(data.top3) ? data.top3 : [],
+        podiumSaved: data.podium_saved !== false,
+      });
       showToast("¡Noche cerrada! Nuevo evento creado ✓");
       dateInitialized.current = false;
       priceInitialized.current = false;
@@ -732,6 +752,117 @@ export default function AdminPage() {
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top 3 modal al cerrar la noche */}
+      {closedNightModal && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-6">
+          <div className="card w-full max-w-md space-y-5 border-r-amber/40 relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-r-red via-r-amber to-r-red" />
+
+            <div className="text-center space-y-1 pt-1">
+              <div className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-r-amber font-semibold">
+                <Trophy size={13} />
+                <span>Noche cerrada</span>
+              </div>
+              <h3 className="font-display text-3xl tracking-wide">
+                TOP 3 DE LA NOCHE
+              </h3>
+              <p className="text-xs text-r-muted capitalize">
+                {closedNightModal.eventName}
+                {closedNightModal.eventDate && (
+                  <>
+                    {" · "}
+                    {new Date(closedNightModal.eventDate).toLocaleDateString(
+                      "es-VE",
+                      {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      },
+                    )}
+                  </>
+                )}
+              </p>
+            </div>
+
+            {closedNightModal.top3.length === 0 ? (
+              <div className="bg-r-surf2 rounded-xl p-6 text-center text-sm text-r-muted">
+                No hubo presentaciones calificadas esta noche.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {closedNightModal.top3.map((entry, idx) => {
+                  const pos = (entry.position ?? idx + 1) - 1;
+                  const medals = ["🏆", "🥈", "🥉"];
+                  const labels = ["1er lugar", "2do lugar", "3er lugar"];
+                  return (
+                    <div
+                      key={`${entry.user_id}-${pos}`}
+                      className={clsx(
+                        "rounded-xl p-3 border flex items-center gap-3",
+                        pos === 0
+                          ? "bg-r-amber/10 border-r-amber/40"
+                          : pos === 1
+                            ? "bg-r-surf2 border-r-border"
+                            : "bg-r-surf2/60 border-r-border/70",
+                      )}
+                    >
+                      <span className="text-2xl w-8 text-center shrink-0">
+                        {medals[pos] ?? `${pos + 1}`}
+                      </span>
+                      <Avatar
+                        name={entry.user_name}
+                        url={entry.avatar_url}
+                        size={40}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-r-muted font-semibold">
+                          {labels[pos] ?? `#${pos + 1}`}
+                        </p>
+                        <p
+                          className={clsx(
+                            "text-sm font-semibold truncate",
+                            pos === 0 && "text-r-amber",
+                          )}
+                        >
+                          {entry.user_name}
+                        </p>
+                        <p className="text-xs text-r-muted truncate">
+                          {entry.song_name}
+                          {entry.artist ? ` · ${entry.artist}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-display text-2xl text-r-star leading-none">
+                          {Number(entry.avg_rating).toFixed(1)}
+                        </p>
+                        <p className="text-[10px] text-r-muted">
+                          {entry.vote_count} voto
+                          {Number(entry.vote_count) !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!closedNightModal.podiumSaved && (
+              <p className="text-[11px] text-r-amber bg-r-amber/10 border border-r-amber/20 rounded-lg px-3 py-2">
+                Solo se guardó el 1er lugar en el historial porque falta
+                ejecutar la migración SQL del Top 3 en Supabase.
+              </p>
+            )}
+
+            <button
+              onClick={() => setClosedNightModal(null)}
+              className="btn-primary"
+            >
+              LISTO
+            </button>
           </div>
         </div>
       )}

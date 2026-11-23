@@ -56,3 +56,16 @@ export interface SpotifyTrack {
   album: string;
   albumArt: string | null;
 }
+
+export interface NightPodiumEntry {
+  event_id?: string;
+  event_date?: string;
+  position: number;
+  user_id: string;
+  user_name: string;
+  avatar_url?: string | null;
+  song_name: string;
+  artist?: string;
+  avg_rating: number;
+  vote_count: number;
+}

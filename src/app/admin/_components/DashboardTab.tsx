@@ -315,38 +315,98 @@ export function DashboardTab({
           )}
         </div>
 
-        {/* Ganadores por noche */}
-        {histWinners.length > 0 && (
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy size={14} className="text-r-amber" />
-              <span className="section-title mb-0">Ganadores por noche</span>
-            </div>
-            <div className="space-y-3">
-              {histWinners.slice(0, 10).map((w, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-xs text-r-muted w-20 shrink-0">
-                    {new Date(w.event_date).toLocaleDateString("es-VE", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {w.user_name}
+        {/* Top 3 por noche */}
+        {histWinners.length > 0 && (() => {
+          const nightsMap = new Map<
+            string,
+            { date: string; entries: any[] }
+          >();
+          histWinners.forEach((w) => {
+            const key = w.event_id || w.event_date || "unknown";
+            const group: { date: string; entries: any[] } = nightsMap.get(
+              key,
+            ) ?? {
+              date: w.event_date,
+              entries: [],
+            };
+            group.entries.push(w);
+            nightsMap.set(key, group);
+          });
+          const nights = Array.from(nightsMap.entries())
+            .slice(0, 10)
+            .map(([key, g]) => ({
+              key,
+              date: g.date,
+              entries: [...g.entries]
+                .sort((a, b) => (a.position ?? 1) - (b.position ?? 1))
+                .slice(0, 3),
+            }));
+          const medals = ["🏆", "🥈", "🥉"];
+
+          return (
+            <div className="card">
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy size={14} className="text-r-amber" />
+                <span className="section-title mb-0">Top 3 por noche</span>
+              </div>
+              <div className="space-y-3">
+                {nights.map((night) => (
+                  <div
+                    key={night.key}
+                    className="bg-r-surf2/60 border border-r-border/60 rounded-xl p-3 space-y-2"
+                  >
+                    <p className="text-[11px] uppercase tracking-wider text-r-muted font-semibold">
+                      {new Date(night.date).toLocaleDateString("es-VE", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </p>
-                    <p className="text-xs text-r-muted truncate">
-                      {w.song_name}
-                    </p>
+                    <div className="space-y-2">
+                      {night.entries.map((w, idx) => {
+                        const pos = (w.position ?? idx + 1) - 1;
+                        return (
+                          <div
+                            key={`${night.key}-${pos}-${w.user_id ?? idx}`}
+                            className="flex items-center gap-2.5"
+                          >
+                            <span className="text-sm w-5 text-center shrink-0">
+                              {medals[pos] ?? `${pos + 1}`}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={clsx(
+                                  "text-sm font-medium truncate",
+                                  pos === 0 && "text-r-amber",
+                                )}
+                              >
+                                {w.user_name}
+                              </p>
+                              <p className="text-xs text-r-muted truncate">
+                                {w.song_name}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-r-star font-display text-lg leading-none block">
+                                {Number(w.avg_rating).toFixed(1)}
+                              </span>
+                              {w.vote_count != null && (
+                                <span className="text-[10px] text-r-muted">
+                                  {w.vote_count} voto
+                                  {Number(w.vote_count) !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <span className="text-r-star font-display text-lg shrink-0">
-                    {Number(w.avg_rating).toFixed(1)}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

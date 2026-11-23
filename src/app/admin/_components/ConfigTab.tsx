@@ -311,8 +311,8 @@ export function ConfigTab({
           <XCircle size={15} className="text-r-red" /> Cerrar noche
         </h3>
         <p className="text-xs text-r-muted mb-4">
-          Guarda al ganador de la noche, cierra el evento actual y crea uno
-          nuevo en blanco.
+          Guarda el Top 3 cantantes de la noche, cierra el evento actual y crea
+          uno nuevo en blanco.
         </p>
         <div className="bg-r-surf2 rounded-xl p-4 mb-4 space-y-2 text-sm">
           <div className="flex justify-between">
@@ -327,7 +327,14 @@ export function ConfigTab({
           </div>
           <div className="flex justify-between">
             <span className="text-r-muted">Votaciones</span>
-            <span>{ratings.length} votos emitidos</span>
+            <span>
+              {
+                ratings.filter((r) =>
+                  queue.some((q) => q.id === r.song_queue_id),
+                ).length
+              }{" "}
+              votos emitidos
+            </span>
           </div>
         </div>
         <button

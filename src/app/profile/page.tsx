@@ -89,14 +89,26 @@ export default function ProfilePage() {
         setStats({ requested: songs.length, sang, noshow, avgRating });
       }
 
-      // Verificar si ganó el evento más reciente
-      const { data: lastWin } = await supabase
+      // Verificar si ganó (#1) el evento más reciente
+      let { data: lastWin, error: winErr } = await supabase
         .from("event_winners")
         .select("song_name, avg_rating, event_date, event_id")
         .eq("user_id", auth.id)
+        .eq("position", 1)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
+
+      if (winErr?.code === "42703" || winErr?.code === "PGRST204") {
+        const fallback = await supabase
+          .from("event_winners")
+          .select("song_name, avg_rating, event_date, event_id")
+          .eq("user_id", auth.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        lastWin = fallback.data;
+      }
 
       if (lastWin) {
         const shownKey = `winner_toast_${lastWin.event_id}`;
